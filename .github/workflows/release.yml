@@ -1,0 +1,26 @@
+name: Release PA POS
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run release
