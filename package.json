@@ -1,6 +1,10 @@
 {
   "name": "pa-pos",
   "version": "1.0.0",
+  "author": {
+    "name": "NEO",
+    "email": "neoplaxsolucionesinformaticas@gmail.com"
+  },
   "description": "Sistema POS para Perros Americanos",
   "main": "src/main/index.js",
   "scripts": {
