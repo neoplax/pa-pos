@@ -19,7 +19,7 @@ jobs:
       - name: Build Windows
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run build:renderer:prod && electron-builder --win --publish always
+        run: npm run build:renderer:prod && npx electron-builder --win --publish always
 
   build-linux:
     runs-on: ubuntu-latest
@@ -34,4 +34,4 @@ jobs:
       - name: Build Linux
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run build:renderer:prod && electron-builder --linux --publish always
+        run: npm run build:renderer:prod && npx electron-builder --linux --publish always
