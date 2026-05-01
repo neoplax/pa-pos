@@ -6,3 +6,4 @@ build/
 *.log
 credentials.json
 tokens.json
+release/
