@@ -19,6 +19,7 @@ export default function Reportes() {
   const [bajas, setBajas]                   = useState([]);
   const [saldo, setSaldo]                   = useState(null);
   const [empleados, setEmpleados]           = useState([]);
+  const [reporteDescuentos, setReporteDescuentos] = useState(null);
   const [cargando, setCargando]             = useState(false);
 
   const hoy = new Date().toISOString().split('T')[0];
@@ -40,10 +41,11 @@ export default function Reportes() {
         window.electronAPI.getVentasDomicilios({ fechaInicio, fechaFin: hoy }),
         window.electronAPI.getBajas({ fechaInicio, fechaFin: hoy }),
         window.electronAPI.getEmpleados(),
+        window.electronAPI.getReporteDescuentos({ fechaInicio, fechaFin: hoy }),
       ];
       if (esAdmin) promesas.push(window.electronAPI.getSaldoDisponible());
 
-      const [dias, prods, comprasData, gastosData, provs, doms, bajasData, emps, saldoData] =
+      const [dias, prods, comprasData, gastosData, provs, doms, bajasData, emps, descData, saldoData] =
         await Promise.all(promesas);
 
       setVentasDia(dias);
@@ -54,6 +56,7 @@ export default function Reportes() {
       setDomicilios(doms || { resumen: {}, lista: [] });
       setBajas(bajasData || []);
       setEmpleados(emps || []);
+      setReporteDescuentos(descData || null);
       if (esAdmin && saldoData) setSaldo(saldoData);
     } catch (err) {
       console.error('[Reportes] Error:', err);
@@ -84,7 +87,7 @@ export default function Reportes() {
       {esAdmin && saldo && (
         <div className="card mb-24">
           <div className="card-titulo" style={{ marginBottom: 16 }}>
-            💰 SALDO DISPONIBLE ACTUAL (histórico total)
+            💰 SALDO DISPONIBLE ACTUAL
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 16 }}>
             <TarjetaSaldo
@@ -108,7 +111,9 @@ export default function Reportes() {
             />
           </div>
           <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 8 }}>
-            Calculado sobre el historial completo: ventas − gastos − compras por método de pago.
+            Base inicial hoy: 💵 ${(saldo.baseEfectivo || 0).toLocaleString('es-CO')} efectivo
+            {' '}· 📱 ${(saldo.baseNequi || 0).toLocaleString('es-CO')} Nequi.
+            {' '}Calculado sobre historial completo: base + ventas − gastos − compras por método.
           </div>
         </div>
       )}
@@ -173,6 +178,7 @@ export default function Reportes() {
           { id: 'gastos',      label: '💸 Gastos / Compras'  },
           { id: 'proveedores', label: '🚚 Proveedores'       },
           { id: 'domicilios',  label: '🛵 Domicilios'        },
+          { id: 'descuentos',  label: '🏷️ Descuentos'       },
           { id: 'bajas',       label: '📉 Bajas'             },
         ].map(t => (
           <button key={t.id}
@@ -195,7 +201,9 @@ export default function Reportes() {
       ) : vista === 'gastos' ? (
         <GastosPeriodo compras={compras} gastos={gastosPeriodo} formatFecha={formatFecha} />
       ) : vista === 'domicilios' ? (
-        <ReporteDomicilios data={domicilios} />
+        <ReporteDomicilios data={domicilios} fechaInicio={fechaInicio} fechaFin={hoy} />
+      ) : vista === 'descuentos' ? (
+        <ReporteDescuentos data={reporteDescuentos} />
       ) : vista === 'bajas' ? (
         <ReporteBajas datos={bajas} />
       ) : (
@@ -539,14 +547,41 @@ function VentasPorProducto({ datos }) {
 
 // ── Reporte Domicilios ────────────────────────────────────────────────────────
 
-function ReporteDomicilios({ data }) {
+const LABEL_PLATAFORMA = {
+  rappi:           'Rappi',
+  ifood:           'iFood',
+  domicilios_com:  'Domicilios.com',
+  whatsapp:        'WhatsApp',
+  otro:            'Otro',
+};
+
+function ReporteDomicilios({ data, fechaInicio, fechaFin }) {
   const { resumen = {}, lista = [] } = data;
   const numDom   = resumen.num_domicilios    || 0;
   const totalDom = resumen.total_domicilios  || 0;
   const promDom  = resumen.promedio_domicilio || 0;
 
+  const [externos, setExternos] = useState(null);
+  const [cargandoExt, setCargandoExt] = useState(false);
+
+  useEffect(() => {
+    if (!fechaInicio || !fechaFin) return;
+    setCargandoExt(true);
+    window.electronAPI.getReporteDomiciliosExternos({ fechaInicio, fechaFin })
+      .then(d => setExternos(d))
+      .catch(() => {})
+      .finally(() => setCargandoExt(false));
+  }, [fechaInicio, fechaFin]);
+
+  const porPlataforma  = externos?.porPlataforma  || [];
+  const propios        = externos?.propios        || {};
+  const externosList   = externos?.externos       || [];
+  const totalComisiones = porPlataforma.reduce((s, p) => s + (p.total_comisiones || 0), 0);
+  const totalNeto       = porPlataforma.reduce((s, p) => s + (p.ingreso_neto    || 0), 0);
+
   return (
     <div>
+      {/* Stats generales */}
       <div className="stats-grid mb-24">
         <div className="stat-card naranja">
           <span className="stat-icono">🛵</span>
@@ -555,7 +590,7 @@ function ReporteDomicilios({ data }) {
         </div>
         <div className="stat-card verde">
           <span className="stat-icono">💵</span>
-          <span className="stat-label">Total cobrado</span>
+          <span className="stat-label">Total cobrado (domicilios)</span>
           <span className="stat-valor">${totalDom.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card azul">
@@ -565,26 +600,150 @@ function ReporteDomicilios({ data }) {
         </div>
       </div>
 
+      {/* Plataformas externas */}
+      {cargandoExt ? (
+        <div className="cargando">⏳ Cargando datos de plataformas...</div>
+      ) : porPlataforma.length > 0 ? (
+        <>
+          <div className="card mb-16">
+            <div className="card-titulo">📱 Plataformas externas — Comisiones del período</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+              <div style={{ background: 'var(--fondo)', border: '2px solid var(--rojo)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--texto-suave)', marginBottom: 4 }}>Total comisiones pagadas</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--rojo)' }}>
+                  -${totalComisiones.toLocaleString('es-CO')}
+                </div>
+              </div>
+              <div style={{ background: 'var(--fondo)', border: '2px solid var(--verde)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--texto-suave)', marginBottom: 4 }}>Ingreso neto plataformas</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--verde)' }}>
+                  ${totalNeto.toLocaleString('es-CO')}
+                </div>
+              </div>
+              <div style={{ background: 'var(--fondo)', border: '2px solid var(--azul)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'var(--texto-suave)', marginBottom: 4 }}>Pedidos propios (WhatsApp)</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--azul)' }}>
+                  {propios?.pedidos || 0}
+                </div>
+              </div>
+            </div>
+
+            {/* Desglose por plataforma */}
+            <div className="tabla-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Plataforma</th>
+                    <th style={{ textAlign: 'right' }}>Pedidos</th>
+                    <th style={{ textAlign: 'right' }}>Total bruto</th>
+                    <th style={{ textAlign: 'right' }}>Comisiones</th>
+                    <th style={{ textAlign: 'right' }}>Ingreso neto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porPlataforma.map(p => (
+                    <tr key={p.plataforma_domicilio}>
+                      <td className="negrita">
+                        {LABEL_PLATAFORMA[p.plataforma_domicilio] || p.plataforma_domicilio}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{p.pedidos}</td>
+                      <td style={{ textAlign: 'right' }} className="texto-naranja negrita">
+                        ${(p.total_bruto || 0).toLocaleString('es-CO')}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="texto-rojo">
+                        -${(p.total_comisiones || 0).toLocaleString('es-CO')}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="texto-verde negrita">
+                        ${(p.ingreso_neto || 0).toLocaleString('es-CO')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Detalle pedidos externos */}
+          {externosList.length > 0 && (
+            <div className="card mb-16">
+              <div className="card-titulo">Detalle de pedidos por plataforma</div>
+              <div className="tabla-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th><th>Plataforma</th><th>Orden</th>
+                      <th style={{ textAlign: 'right' }}>Total</th>
+                      <th style={{ textAlign: 'right' }}>Comisión</th>
+                      <th style={{ textAlign: 'right' }}>Neto</th>
+                      <th>Factura</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {externosList.map((v, i) => (
+                      <tr key={i}>
+                        <td className="texto-suave">{(v.fecha || '').split(' ')[0]}</td>
+                        <td>
+                          <span className="badge badge-azul">
+                            {LABEL_PLATAFORMA[v.plataforma_domicilio] || v.plataforma_domicilio}
+                          </span>
+                        </td>
+                        <td className="texto-suave">{v.numero_orden_domicilio || '—'}</td>
+                        <td style={{ textAlign: 'right' }} className="texto-naranja negrita">
+                          ${(v.total || 0).toLocaleString('es-CO')}
+                        </td>
+                        <td style={{ textAlign: 'right' }} className="texto-rojo">
+                          -{v.comision_domicilio_pct}% = ${(v.comision_domicilio_valor || 0).toLocaleString('es-CO')}
+                        </td>
+                        <td style={{ textAlign: 'right' }} className="texto-verde negrita">
+                          ${(v.valor_neto || 0).toLocaleString('es-CO')}
+                        </td>
+                        <td className="texto-suave">{v.factura_num > 0 ? `#${v.factura_num}` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        externos !== null && (
+          <div className="alerta azul mb-16">
+            Sin pedidos de plataformas externas en este período.
+          </div>
+        )
+      )}
+
+      {/* Domicilios propios (lista histórica de todas las ventas con domicilio) */}
       {lista.length === 0 ? (
         <div className="vacio card">Sin domicilios en este período</div>
       ) : (
         <div className="card">
-          <div className="card-titulo">Detalle de domicilios</div>
+          <div className="card-titulo">Todos los domicilios del período ({lista.length})</div>
           <div className="tabla-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Fecha</th><th>Empleado</th><th>Total venta</th>
-                  <th>Domicilio</th><th>Pago</th><th>Factura</th>
+                  <th>Domicilio</th><th>Tipo</th><th>Pago</th><th>Factura</th>
                 </tr>
               </thead>
               <tbody>
                 {lista.map(v => (
                   <tr key={v.id}>
-                    <td className="texto-suave">{v.fecha.split(' ')[0]}</td>
+                    <td className="texto-suave">{(v.fecha || '').split(' ')[0]}</td>
                     <td>👤 {v.empleado}</td>
                     <td className="negrita texto-naranja">${(v.total || 0).toLocaleString('es-CO')}</td>
                     <td className="negrita texto-verde">${(v.domicilio || 0).toLocaleString('es-CO')}</td>
+                    <td>
+                      {v.plataforma_domicilio && v.plataforma_domicilio !== '' ? (
+                        <span className="badge badge-azul">
+                          {LABEL_PLATAFORMA[v.plataforma_domicilio] || v.plataforma_domicilio}
+                        </span>
+                      ) : (
+                        <span className="badge badge-verde">Propio</span>
+                      )}
+                    </td>
                     <td><span className="badge badge-azul">{v.metodo_pago}</span></td>
                     <td className="texto-suave">{v.factura_num > 0 ? `#${v.factura_num}` : '—'}</td>
                   </tr>
@@ -677,6 +836,75 @@ function ReporteProveedores({ compras, proveedores }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Reporte Descuentos ────────────────────────────────────────────────────────
+
+function ReporteDescuentos({ data }) {
+  if (!data) return <div className="cargando">⏳ Cargando...</div>;
+
+  const { resumen = {}, porDescuento = [] } = data;
+  const totalDescontado  = resumen.total_descontado   || 0;
+  const ventasConDesc    = resumen.ventas_con_descuento || 0;
+  const promedioDescuento = resumen.promedio_descuento  || 0;
+
+  return (
+    <div>
+      <div className="stats-grid mb-24">
+        <div className="stat-card naranja">
+          <span className="stat-icono">🏷️</span>
+          <span className="stat-label">Ventas con descuento</span>
+          <span className="stat-valor">{ventasConDesc}</span>
+        </div>
+        <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
+          <span className="stat-icono">💸</span>
+          <span className="stat-label">Total descontado</span>
+          <span className="stat-valor texto-rojo">
+            -${Math.round(totalDescontado).toLocaleString('es-CO')}
+          </span>
+        </div>
+        <div className="stat-card azul">
+          <span className="stat-icono">📊</span>
+          <span className="stat-label">Descuento promedio</span>
+          <span className="stat-valor">${Math.round(promedioDescuento).toLocaleString('es-CO')}</span>
+        </div>
+      </div>
+
+      {porDescuento.length === 0 ? (
+        <div className="vacio card">Sin ventas con descuento en este período</div>
+      ) : (
+        <div className="card">
+          <div className="card-titulo">Descuentos aplicados por tipo</div>
+          <div className="tabla-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Descuento</th>
+                  <th style={{ textAlign: 'right' }}>Usos</th>
+                  <th style={{ textAlign: 'right' }}>Total descontado</th>
+                  <th style={{ textAlign: 'right' }}>Promedio por uso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porDescuento.map(d => (
+                  <tr key={d.descuento_nombre}>
+                    <td className="negrita">{d.descuento_nombre || '(sin nombre)'}</td>
+                    <td style={{ textAlign: 'right' }}>{d.usos}</td>
+                    <td style={{ textAlign: 'right' }} className="texto-rojo negrita">
+                      -${(d.total_descontado || 0).toLocaleString('es-CO')}
+                    </td>
+                    <td style={{ textAlign: 'right' }} className="texto-suave">
+                      ${d.usos > 0 ? Math.round(d.total_descontado / d.usos).toLocaleString('es-CO') : 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -431,7 +431,6 @@ function patchCostosIngredientes(db) {
     ['Salchicha',         1414],
     ['Chorizo',           1560],
     ['Carne hamburguesa', 1267],
-    ['Tocineta',         15000],  // por paquete
     // Panes
     ['Pan perro',          625],
     ['Pan hamburguesa',    625],
@@ -441,6 +440,10 @@ function patchCostosIngredientes(db) {
     // Papas (costo por gramo: $21000 / (31 porciones × 200g) ≈ $3.39/g)
     ['Papas fritas',      3.39],
     ['Papas migaja',      4.33],  // estimado $13000/3kg
+    // Vegetales
+    ['Tomate',             500],  // ~$500 por unidad
+    ['Lechuga',           2500],  // ~$2500 por cabeza
+    ['Cebolla',            600],  // ~$600 por unidad
     // Toppings
     ['Piña',              9000],
     ['Jalapeños',        31000],
@@ -474,6 +477,10 @@ function patchCostosIngredientes(db) {
     ['C1',                 300],
   ];
   for (const [nombre, costo] of costos) upd.run(costo, nombre);
+  // Tocineta: costo según unidad actual (no sobreescribir migración de paquete→tira)
+  // Paquete = $15.000 → tira = $15.000 / 32 = $468.75
+  db.prepare("UPDATE ingredientes SET costo_unitario=15000  WHERE nombre='Tocineta' AND unidad='paquete'").run();
+  db.prepare("UPDATE ingredientes SET costo_unitario=468.75 WHERE nombre='Tocineta' AND unidad='tira'").run();
 }
 
 // Actualizar recetas con cantidades correctas
@@ -684,13 +691,13 @@ function patchUnidadesV2(db) {
     db.prepare('UPDATE recetas SET cantidad=1 WHERE ingrediente_id=? AND cantidad>0 AND cantidad<200').run(papas.id);
   }
 
-  // ── Tocineta: de PAQUETES a TIRAS (1 paquete = 12 tiras, costo=$1.250/tira) ──
+  // ── Tocineta: de PAQUETES a TIRAS (1 paquete = 32 tiras, costo=$468.75/tira) ──
   const tocineta = db.prepare("SELECT * FROM ingredientes WHERE nombre='Tocineta' LIMIT 1").get();
   if (tocineta && tocineta.unidad === 'paquete') {
-    const stockTiras = Math.max(0, Math.round(tocineta.stock_actual * 12));
+    const stockTiras = Math.max(0, Math.round(tocineta.stock_actual * 32));
     db.prepare(`
       UPDATE ingredientes SET
-        unidad='tira', costo_unitario=1250, stock_actual=?, stock_minimo=12
+        unidad='tira', costo_unitario=468.75, stock_actual=?, stock_minimo=12
       WHERE id=?
     `).run(stockTiras, tocineta.id);
 
@@ -700,6 +707,32 @@ function patchUnidadesV2(db) {
 
   db.prepare("INSERT INTO configuracion (clave, valor) VALUES ('patch_unidades_v2','1') ON CONFLICT(clave) DO UPDATE SET valor='1'").run();
   console.log('[DB] patchUnidadesV2: unidades de Papa francesa y Tocineta corregidas.');
+}
+
+// Corrección de costo de Tocineta: paquete de 32 tiras = $15.000 → $468.75/tira
+// Actualiza también notas_unidad y verifica que las recetas usen 1 tira por plato
+function patchTocinetaV3(db) {
+  const done = db.prepare("SELECT valor FROM configuracion WHERE clave='patch_tocineta_v3'").get();
+  if (done?.valor === '1') return;
+
+  const tocineta = db.prepare("SELECT id, unidad FROM ingredientes WHERE nombre='Tocineta' LIMIT 1").get();
+  if (tocineta) {
+    db.prepare(`
+      UPDATE ingredientes
+      SET costo_unitario=468.75,
+          notas_unidad='Paquete de 32 tiras = $15.000'
+      WHERE id=?
+    `).run(tocineta.id);
+
+    // Verificar que todas las recetas que usan Tocineta estén en 1 tira
+    // (Salchipapa Americana, Combos, Adición Tocineta)
+    db.prepare('UPDATE recetas SET cantidad=1 WHERE ingrediente_id=? AND cantidad!=1').run(tocineta.id);
+  }
+
+  db.prepare(
+    "INSERT INTO configuracion (clave, valor) VALUES ('patch_tocineta_v3','1') ON CONFLICT(clave) DO UPDATE SET valor='1'"
+  ).run();
+  console.log('[DB] patchTocinetaV3: Tocineta → $468.75/tira (paquete 32 tiras = $15.000)');
 }
 
 // Eliminar ventas y compra de prueba del 23 de abril 2026
@@ -731,4 +764,5 @@ module.exports = {
   patchRolesEmpleados,
   patchUnidadesV2,
   patchLimpiezaDatosPrueba,
+  patchTocinetaV3,
 };

@@ -2,7 +2,7 @@ const { shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const { execSync } = require('child_process');
+const { execSync, exec } = require('child_process');
 
 // Ancho de línea para papel 80mm (48 caracteres monoespaciados)
 const W = 48;
@@ -64,6 +64,8 @@ function construirBuffer(partes) {
 function _partesRecibo({
   factura_num, fecha, empleado, items, subtotal, domicilio, total,
   metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, efectivo_recibido,
+  descuento_valor = 0, descuento_nombre = '',
+  mesa_nombre = '',
 }) {
   const { fecha: fechaStr, hora } = formatFechaRecibo(fecha || new Date().toISOString());
   const numStr = String(factura_num || 0).padStart(4, '0');
@@ -82,6 +84,9 @@ function _partesRecibo({
   p.push({ texto: `Fecha: ${fechaStr}  ${hora}` });
   p.push({ texto: `Factura No.: ${numStr}` });
   p.push({ texto: `Despacho: ${empleado || ''}` }); // sin tilde para compatibilidad latin1
+  if (mesa_nombre && mesa_nombre !== '') {
+    p.push({ texto: `Mesa: ${mesa_nombre}` });
+  }
   p.push({ texto: linea('-') });
   p.push({ texto: 'CONSUMIDOR FINAL' });
   p.push({ texto: linea('-') });
@@ -111,7 +116,14 @@ function _partesRecibo({
   const WL = 22, WV = W - WL;
   p.push({ texto: padR('SUBTOTAL',  WL) + padR(money(subtotal || total), WV) });
   p.push({ texto: padR('DOMICILIO', WL) + padR(domicilio > 0 ? money(domicilio) : '$0', WV) });
-  p.push({ texto: padR('DCTO.',     WL) + padR('$0', WV) });
+  if (descuento_valor > 0) {
+    const etiqDcto = descuento_nombre
+      ? `DCTO. ${descuento_nombre}`.slice(0, WL)
+      : 'DCTO.';
+    p.push({ texto: padR(etiqDcto, WL) + padR(`-${money(descuento_valor)}`, WV) });
+  } else {
+    p.push({ texto: padR('DCTO.',   WL) + padR('$0', WV) });
+  }
   p.push({ texto: linea('-') });
   p.push({ texto: padR('TOTAL', WL) + padR(money(total), WV), negrita: true });
   p.push({ texto: padR('ITEMS', WL) + padR(String(totalItems), WV) });
@@ -283,55 +295,119 @@ function printLinux(buffer, texto, puerto) {
   }
 }
 
-// ── Impresión en Windows — ESC/POS vía puerto USB ────────────────────────────
-function printWindows(buffer, texto, printerName) {
+// ── Log de impresión en Windows ───────────────────────────────────────────────
+function _logWin(msg) {
+  const ts = new Date().toISOString();
+  try {
+    fs.appendFileSync(
+      path.join(os.tmpdir(), 'perros-print-win.log'),
+      `[${ts}] ${msg}\n`
+    );
+  } catch (_) {}
+  console.log('[Win]', msg);
+}
+
+// Ejecutar un comando y devolver promesa (para impresión no bloqueante)
+function _execAsync(cmd, opts = {}) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { shell: 'cmd.exe', timeout: 10000, ...opts }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+// ── Impresión en Windows — cascada de métodos ESC/POS ────────────────────────
+async function printWindows(buffer, texto, printerName) {
   const tmpDir = path.join(os.tmpdir(), 'perros-pos');
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
   const tmpBin = path.join(tmpDir, 'recibo.bin');
-  const tmpTxt = path.join(tmpDir, 'recibo.txt');
   fs.writeFileSync(tmpBin, buffer);
-  fs.writeFileSync(tmpTxt, texto, 'utf8');
 
+  // Siempre guardar .txt como registro histórico (independiente de si imprime)
+  _guardarTxt(texto);
+
+  const nombre = printerName || 'POS-80C';
+  _logWin(`Impresora seleccionada: ${nombre}`);
+  _logWin('Intentando imprimir...');
+
+  // ── Intento 1: copy /b al recurso compartido local ────────────────────────
+  // Funciona cuando la impresora está compartida en red local del equipo
+  const cmd1 = `copy /b "${tmpBin}" "\\\\%COMPUTERNAME%\\${nombre}"`;
   try {
-    // Obtener nombre del puerto USB de la impresora
-    const wmic = execSync(
-      `wmic printer where "Name='${printerName.replace(/'/g, "\\'")}'" get PortName /format:value`,
+    _logWin(`Intento 1 (copy /b recurso compartido): ${cmd1}`);
+    await _execAsync(cmd1);
+    _logWin('Resultado: OK (copy_share)');
+    return { ok: true, metodo: 'copy_share' };
+  } catch (e1) {
+    _logWin(`Resultado intento 1: ${e1.message}`);
+  }
+
+  // ── Obtener puerto USB de la impresora via WMIC ───────────────────────────
+  let port = null;
+  try {
+    const wmicOut = execSync(
+      `wmic printer where "Name='${nombre.replace(/'/g, "\\'")}'" get PortName /format:value`,
       { encoding: 'utf8', shell: 'cmd.exe', timeout: 5000 }
     );
-    const port = wmic.match(/PortName=([^\r\n]+)/)?.[1]?.trim();
-    if (port) {
-      // Enviar buffer ESC/POS raw al puerto (USB001, LPT1, etc.)
-      const safePath = tmpBin.replace(/\\/g, '\\\\');
-      const safePort = port.replace(/\\/g, '\\\\');
-      execSync(
-        `powershell -Command "[System.IO.File]::WriteAllBytes('\\\\.\\${safePort}', [System.IO.File]::ReadAllBytes('${safePath}'))"`,
-        { shell: 'cmd.exe', timeout: 10000 }
-      );
-      return { ok: true, metodo: 'escpos_raw' };
-    }
-  } catch (e1) {
-    // Fallback 1: comando print /d:
+    port = wmicOut.match(/PortName=([^\r\n]+)/)?.[1]?.trim() || null;
+    if (port) _logWin(`Puerto detectado via WMIC: ${port}`);
+    else      _logWin('WMIC no devolvió un puerto para esta impresora');
+  } catch (eWmic) {
+    _logWin(`WMIC falló: ${eWmic.message}`);
+  }
+
+  // ── Intento 2: copy /b directo al puerto USB ──────────────────────────────
+  if (port) {
+    const cmd2 = `copy /b "${tmpBin}" "${port}"`;
     try {
-      execSync(`print /d:"${printerName}" "${tmpTxt}"`, { shell: 'cmd.exe', timeout: 10000 });
-      return { ok: true, metodo: 'print_cmd' };
+      _logWin(`Intento 2 (copy /b puerto ${port}): ${cmd2}`);
+      await _execAsync(cmd2);
+      _logWin('Resultado: OK (copy_port)');
+      return { ok: true, metodo: 'copy_port' };
     } catch (e2) {
-      // Fallback 2: abrir archivo en editor por defecto
-      shell.openPath(tmpTxt);
-      return { ok: true, metodo: 'fallback_open', aviso: 'impresora_no_disponible' };
+      _logWin(`Resultado intento 2: ${e2.message}`);
+    }
+
+    // ── Intento 3: PowerShell WriteAllBytes al puerto ─────────────────────
+    // Escribe el buffer binario ESC/POS directamente al handle del puerto
+    const safeBin  = tmpBin.replace(/\\/g, '\\\\');
+    const safePort = port.replace(/\\/g, '\\\\');
+    const cmd3 = `powershell -Command "[System.IO.File]::WriteAllBytes('\\\\.\\${safePort}', [System.IO.File]::ReadAllBytes('${safeBin}'))"`;
+    try {
+      _logWin(`Intento 3 (PowerShell WriteAllBytes a puerto ${port})`);
+      await _execAsync(cmd3, { timeout: 12000 });
+      _logWin('Resultado: OK (powershell_port)');
+      return { ok: true, metodo: 'powershell_port' };
+    } catch (e3) {
+      _logWin(`Resultado intento 3: ${e3.message}`);
     }
   }
 
-  shell.openPath(tmpTxt);
-  return { ok: true, metodo: 'fallback_open', aviso: 'impresora_no_disponible' };
+  // ── Intento 4: print /d con el binario ────────────────────────────────────
+  // Último recurso antes de rendirse; envía el .bin al spooler de Windows
+  const cmd4 = `print /d:"${nombre}" "${tmpBin}"`;
+  try {
+    _logWin(`Intento 4 (print /d binario): ${cmd4}`);
+    await _execAsync(cmd4);
+    _logWin('Resultado: OK (print_cmd)');
+    return { ok: true, metodo: 'print_cmd' };
+  } catch (e4) {
+    _logWin(`Resultado intento 4: ${e4.message}`);
+  }
+
+  // Todos los intentos fallaron — .txt ya fue guardado como respaldo
+  _logWin('Todos los intentos fallaron — respaldo .txt guardado en ~/perros-americanos/recibos/');
+  return { ok: true, metodo: 'txt_backup', aviso: 'impresora_no_disponible' };
 }
 
 // ── Punto de entrada: imprimir recibo de venta ────────────────────────────────
-function imprimirRecibo(datos) {
+async function imprimirRecibo(datos) {
   try {
     const buffer = construirBuffer(_partesRecibo(datos));
     const texto  = generarTextoRecibo(datos);
-    if (process.platform === 'win32' && datos.printerName) {
-      return printWindows(buffer, texto, datos.printerName);
+    if (process.platform === 'win32') {
+      return await printWindows(buffer, texto, datos.printerName);
     }
     return printLinux(buffer, texto, datos.puertoLinux);
   } catch (err) {
@@ -341,15 +417,18 @@ function imprimirRecibo(datos) {
 }
 
 // ── Punto de entrada: imprimir cierre de caja ─────────────────────────────────
-function imprimirCierre(datos) {
+async function imprimirCierre(datos) {
   try {
     const buffer = construirBuffer(_partesCierre(datos));
     const texto  = generarTextoCierre(datos);
-    // Guardar siempre copia .txt del cierre
-    _guardarTxt(texto, 'cierre', datos.fecha);
-    if (process.platform === 'win32' && datos.printerName) {
-      return printWindows(buffer, texto, datos.printerName);
+    if (process.platform === 'win32') {
+      // _guardarTxt lo llama printWindows internamente con subtipo 'recibo';
+      // para el cierre guardamos también copia en /cierres/
+      _guardarTxt(texto, 'cierre', datos.fecha);
+      return await printWindows(buffer, texto, datos.printerName);
     }
+    // En Linux: guardar copia del cierre antes de imprimir
+    _guardarTxt(texto, 'cierre', datos.fecha);
     return printLinux(buffer, texto, datos.puertoLinux);
   } catch (err) {
     console.error('[Print] Error imprimirCierre:', err);
@@ -358,13 +437,13 @@ function imprimirCierre(datos) {
 }
 
 // ── Punto de entrada: imprimir recibo de prueba ───────────────────────────────
-function imprimirPrueba({ printerName, puertoLinux } = {}) {
+async function imprimirPrueba({ printerName, puertoLinux } = {}) {
   try {
     const partes = _partesPrueba();
     const buffer = construirBuffer(partes);
     const texto  = partes.map(p => p.texto).join('\n') + '\n';
-    if (process.platform === 'win32' && printerName) {
-      return printWindows(buffer, texto, printerName);
+    if (process.platform === 'win32') {
+      return await printWindows(buffer, texto, printerName);
     }
     return printLinux(buffer, texto, puertoLinux);
   } catch (err) {

@@ -57,20 +57,32 @@ export default function Configuracion() {
   const [updateProgress, setUpdateProgress]   = useState(null);
   const [updateError, setUpdateError]         = useState(null);
 
+  // Descuentos
+  const [descuentos, setDescuentos]           = useState([]);
+  const [modalDescuento, setModalDescuento]   = useState(null); // null | 'nuevo' | { id, ...datos }
+
+  // Mesas
+  const [mesas, setMesas]                     = useState([]);
+  const [modalMesa, setModalMesa]             = useState(null); // null | { id?, numero, nombre }
+
   const cargar = useCallback(async () => {
     try {
-      const [prods, ings, provs, emps, config] = await Promise.all([
+      const [prods, ings, provs, emps, config, descs, ms] = await Promise.all([
         window.electronAPI.getProductos(),
         window.electronAPI.getIngredientes(),
         window.electronAPI.getProveedores(),
         window.electronAPI.getEmpleados(),
         window.electronAPI.getTodasConfig(),
+        window.electronAPI.getDescuentos(),
+        window.electronAPI.getMesas(),
       ]);
       setProductos(prods || []);
       setIngredientes(ings || []);
       setProveedores(provs || []);
       setEmpleados(emps || []);
       setCfg(config || {});
+      setDescuentos(descs || []);
+      setMesas(ms || []);
     } catch (err) {
       console.error('[Config] Error:', err);
     } finally {
@@ -161,6 +173,51 @@ export default function Configuracion() {
     cargar();
   };
 
+  // ── Descuentos ───────────────────────────────────────────────────────────────
+
+  const guardarDescuento = async (datos) => {
+    if (datos.id) {
+      await window.electronAPI.updateDescuento(datos.id, datos);
+      notificar('✅ Descuento actualizado', 'exito');
+    } else {
+      await window.electronAPI.agregarDescuento(datos);
+      notificar('✅ Descuento creado', 'exito');
+    }
+    setModalDescuento(null);
+    cargar();
+  };
+
+  const toggleDescuento = async (id) => {
+    await window.electronAPI.toggleDescuento(id);
+    cargar();
+  };
+
+  const eliminarDescuento = async (id) => {
+    if (!window.confirm('¿Eliminar este descuento permanentemente?')) return;
+    await window.electronAPI.eliminarDescuento(id);
+    notificar('🗑️ Descuento eliminado', 'exito');
+    cargar();
+  };
+
+  // ── Mesas ────────────────────────────────────────────────────────────────────
+
+  const guardarMesa = async (datos) => {
+    if (datos.id) {
+      await window.electronAPI.updateMesa(datos.id, { nombre: datos.nombre });
+      notificar('✅ Mesa actualizada', 'exito');
+    } else {
+      await window.electronAPI.agregarMesa({ numero: datos.numero, nombre: datos.nombre });
+      notificar('✅ Mesa creada', 'exito');
+    }
+    setModalMesa(null);
+    cargar();
+  };
+
+  const toggleMesa = async (id) => {
+    await window.electronAPI.toggleMesa(id);
+    cargar();
+  };
+
   if (cargando) return <div className="cargando">⏳ Cargando configuración...</div>;
 
   return (
@@ -170,13 +227,16 @@ export default function Configuracion() {
       {/* Tabs */}
       <div className="pos-tabs mb-24">
         {[
-          { id: 'productos',    label: '🍽️ Menú' },
-          { id: 'inventario',   label: '📦 Inventario' },
-          { id: 'empleados',    label: '👥 Empleados' },
-          { id: 'proveedores',  label: '🚚 Proveedores' },
-          { id: 'impresora',    label: '🖨️ Impresora' },
+          { id: 'productos',    label: '🍽️ Menú'           },
+          { id: 'inventario',   label: '📦 Inventario'     },
+          { id: 'empleados',    label: '👥 Empleados'      },
+          { id: 'proveedores',  label: '🚚 Proveedores'    },
+          { id: 'descuentos',   label: '🏷️ Descuentos'    },
+          { id: 'mesas',        label: '🪑 Mesas'          },
+          { id: 'base_caja',    label: '💵 Base de Caja'   },
+          { id: 'impresora',    label: '🖨️ Impresora'     },
           { id: 'sync',         label: '☁️ Sincronización' },
-          { id: 'version',      label: '🔄 Versión' },
+          { id: 'version',      label: '🔄 Versión'        },
         ].map(t => (
           <button key={t.id} className={`pos-tab ${tab === t.id ? 'activo' : ''}`}
             onClick={() => setTab(t.id)}>
@@ -348,9 +408,55 @@ export default function Configuracion() {
         />
       )}
 
+      {/* ── TAB DESCUENTOS ────────────────────────────────────────────────────── */}
+      {tab === 'descuentos' && (
+        <TabDescuentos
+          descuentos={descuentos}
+          onNuevo={() => setModalDescuento('nuevo')}
+          onEditar={d => setModalDescuento(d)}
+          onToggle={id => toggleDescuento(id)}
+          onEliminar={id => eliminarDescuento(id)}
+        />
+      )}
+
+      {/* Modal descuento */}
+      {modalDescuento && (
+        <ModalDescuento
+          datos={modalDescuento === 'nuevo' ? null : modalDescuento}
+          onGuardar={guardarDescuento}
+          onCerrar={() => setModalDescuento(null)}
+        />
+      )}
+
+      {/* ── TAB MESAS ──────────────────────────────────────────────────────────── */}
+      {tab === 'mesas' && (
+        <TabMesas
+          mesas={mesas}
+          onNueva={() => {
+            const siguienteNum = (mesas.length > 0 ? Math.max(...mesas.map(m => m.numero)) + 1 : 1);
+            setModalMesa({ numero: siguienteNum, nombre: `Mesa ${siguienteNum}` });
+          }}
+          onEditar={m => setModalMesa(m)}
+          onToggle={id => toggleMesa(id)}
+        />
+      )}
+
+      {/* Modal mesa */}
+      {modalMesa && (
+        <ModalMesa
+          datos={modalMesa}
+          onGuardar={guardarMesa}
+          onCerrar={() => setModalMesa(null)}
+        />
+      )}
+
       {/* ── TAB IMPRESORA ──────────────────────────────────────────────────────── */}
       {tab === 'impresora' && (
         <TabImpresora cfg={cfg} notificar={notificar} onGuardar={cargar} />
+      )}
+
+      {tab === 'base_caja' && (
+        <TabBaseCaja notificar={notificar} />
       )}
 
       {tab === 'sync' && (
@@ -671,9 +777,7 @@ function ModalEditarProducto({ producto, ingredientes, onCerrar, onGuardar }) {
   };
 
   const guardar = async () => {
-    if (tabLocal === 'receta') {
-      await window.electronAPI.updateRecetaProducto(producto.id, receta);
-    }
+    await window.electronAPI.updateRecetaProducto(producto.id, receta);
     onGuardar(producto.id, { nombre, precio, activo, codigo, categoria });
   };
 
@@ -1711,3 +1815,562 @@ function TabVersion({
     </div>
   );
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// TAB DESCUENTOS
+// ════════════════════════════════════════════════════════════════════════════════
+
+const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+function TabDescuentos({ descuentos, onNuevo, onEditar, onToggle, onEliminar }) {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-16">
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>
+            {descuentos.length} descuentos configurados
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 2 }}>
+            Los descuentos activos aparecen en Punto de Venta para aplicar al carrito.
+          </div>
+        </div>
+        <button className="btn btn-primario" onClick={onNuevo}>
+          ➕ Nuevo descuento
+        </button>
+      </div>
+
+      {descuentos.length === 0 ? (
+        <div className="vacio card">Sin descuentos configurados</div>
+      ) : (
+        <div className="tabla-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Valor</th>
+                <th>Restricción horaria</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {descuentos.map(d => {
+                let diasLabel = '';
+                if (d.dias_semana && d.dias_semana.trim() !== '') {
+                  try {
+                    const dias = JSON.parse(d.dias_semana);
+                    diasLabel = dias.map(n => DIAS_SEMANA[n]).join(', ');
+                  } catch(_) {}
+                }
+                return (
+                  <tr key={d.id}>
+                    <td className="negrita">{d.nombre}</td>
+                    <td>
+                      <span className="badge badge-azul">
+                        {d.tipo === 'porcentaje' ? 'Porcentaje' : d.tipo === 'fijo' ? 'Valor fijo' : 'Gratis'}
+                      </span>
+                    </td>
+                    <td className="texto-naranja negrita">
+                      {d.tipo === 'porcentaje' && `${d.valor}%`}
+                      {d.tipo === 'fijo'       && `$${(d.valor || 0).toLocaleString('es-CO')}`}
+                      {d.tipo === 'gratis'     && '🎁 Gratis'}
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--texto-suave)' }}>
+                      {diasLabel && <div>{diasLabel}</div>}
+                      {d.hora_inicio && d.hora_fin && d.hora_inicio !== '' && (
+                        <div>{d.hora_inicio} – {d.hora_fin}</div>
+                      )}
+                      {!diasLabel && (!d.hora_inicio || d.hora_inicio === '') && (
+                        <span style={{ fontStyle: 'italic' }}>Sin restricción</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge ${d.activo ? 'badge-verde' : 'badge-rojo'}`}>
+                        {d.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex gap-8">
+                        <button className="btn btn-secundario" style={{ padding: '6px 12px', fontSize: 13 }}
+                          onClick={() => onEditar(d)}>
+                          ✏️ Editar
+                        </button>
+                        <button
+                          className={`btn ${d.activo ? 'btn-peligro' : 'btn-exito'}`}
+                          style={{ padding: '6px 12px', fontSize: 13 }}
+                          onClick={() => onToggle(d.id)}
+                        >
+                          {d.activo ? '🚫 Desactivar' : '✅ Activar'}
+                        </button>
+                        <button className="btn btn-peligro" style={{ padding: '6px 10px', fontSize: 13 }}
+                          onClick={() => onEliminar(d.id)}>
+                          🗑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Modal crear/editar descuento ──────────────────────────────────────────────
+
+function ModalDescuento({ datos, onGuardar, onCerrar }) {
+  const esSoloLectura = false;
+  const [form, setForm] = useState({
+    nombre:      datos?.nombre      || '',
+    tipo:        datos?.tipo        || 'porcentaje',
+    valor:       datos?.valor       !== undefined ? String(datos.valor) : '',
+    descripcion: datos?.descripcion || '',
+    activo:      datos?.activo !== undefined ? Boolean(datos.activo) : true,
+    fecha_inicio: datos?.fecha_inicio || '',
+    fecha_fin:    datos?.fecha_fin    || '',
+    hora_inicio:  datos?.hora_inicio  || '',
+    hora_fin:     datos?.hora_fin     || '',
+    dias_semana: (() => {
+      if (!datos?.dias_semana || datos.dias_semana.trim() === '') return [];
+      try { return JSON.parse(datos.dias_semana); } catch(_) { return []; }
+    })(),
+  });
+
+  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const toggleDia = (n) => {
+    setForm(prev => ({
+      ...prev,
+      dias_semana: prev.dias_semana.includes(n)
+        ? prev.dias_semana.filter(d => d !== n)
+        : [...prev.dias_semana, n].sort(),
+    }));
+  };
+
+  const handleGuardar = () => {
+    if (!form.nombre.trim()) { alert('El nombre es obligatorio'); return; }
+    if (form.tipo !== 'gratis' && (!form.valor || parseFloat(form.valor) <= 0)) {
+      alert('Ingresa un valor mayor a 0'); return;
+    }
+    onGuardar({
+      id: datos?.id,
+      ...form,
+      valor: parseFloat(form.valor) || 0,
+    });
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ minWidth: 420, maxWidth: 520 }}>
+        <div className="modal-titulo">
+          {datos?.id ? '✏️ Editar descuento' : '➕ Nuevo descuento'}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Nombre */}
+          <div className="form-grupo">
+            <label className="form-label">Nombre del descuento *</label>
+            <input value={form.nombre} onChange={e => set('nombre', e.target.value)}
+              placeholder="Ej: Promo Seguidor" style={{ width: '100%' }} />
+          </div>
+
+          {/* Tipo + Valor */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="form-grupo" style={{ flex: 1 }}>
+              <label className="form-label">Tipo *</label>
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} style={{ width: '100%' }}>
+                <option value="porcentaje">Porcentaje (%)</option>
+                <option value="fijo">Valor fijo ($)</option>
+                <option value="gratis">Producto gratis</option>
+              </select>
+            </div>
+            {form.tipo !== 'gratis' && (
+              <div className="form-grupo" style={{ flex: 1 }}>
+                <label className="form-label">
+                  {form.tipo === 'porcentaje' ? 'Porcentaje (%)' : 'Valor ($)'}
+                </label>
+                <input type="number" min="0" value={form.valor}
+                  onChange={e => set('valor', e.target.value)}
+                  placeholder={form.tipo === 'porcentaje' ? '10' : '1000'}
+                  style={{ width: '100%' }} />
+              </div>
+            )}
+          </div>
+
+          {/* Descripción */}
+          <div className="form-grupo">
+            <label className="form-label">Descripción (opcional)</label>
+            <input value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
+              placeholder="Breve descripción para referencia" style={{ width: '100%' }} />
+          </div>
+
+          {/* Restricción días */}
+          <div className="form-grupo">
+            <label className="form-label">Días de la semana (vacío = todos los días)</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {DIAS_SEMANA.map((d, n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => toggleDia(n)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    background: form.dias_semana.includes(n) ? 'var(--naranja)' : 'var(--fondo)',
+                    color:      form.dias_semana.includes(n) ? '#fff'           : 'var(--texto)',
+                    border: `1px solid ${form.dias_semana.includes(n) ? 'var(--naranja)' : 'var(--borde)'}`,
+                    fontWeight: form.dias_semana.includes(n) ? 700 : 400,
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Restricción horaria */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="form-grupo" style={{ flex: 1 }}>
+              <label className="form-label">Hora inicio (HH:MM)</label>
+              <input type="time" value={form.hora_inicio} onChange={e => set('hora_inicio', e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+            <div className="form-grupo" style={{ flex: 1 }}>
+              <label className="form-label">Hora fin (HH:MM)</label>
+              <input type="time" value={form.hora_fin} onChange={e => set('hora_fin', e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+          </div>
+
+          {/* Rango de fechas */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="form-grupo" style={{ flex: 1 }}>
+              <label className="form-label">Fecha inicio (opcional)</label>
+              <input type="date" value={form.fecha_inicio} onChange={e => set('fecha_inicio', e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+            <div className="form-grupo" style={{ flex: 1 }}>
+              <label className="form-label">Fecha fin (opcional)</label>
+              <input type="date" value={form.fecha_fin} onChange={e => set('fecha_fin', e.target.value)}
+                style={{ width: '100%' }} />
+            </div>
+          </div>
+
+          {/* Activo */}
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontSize: 14 }}>
+            <input type="checkbox" checked={form.activo} onChange={e => set('activo', e.target.checked)} />
+            Descuento activo
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button className="btn btn-secundario" style={{ flex: 1 }} onClick={onCerrar}>
+            Cancelar
+          </button>
+          <button className="btn btn-primario" style={{ flex: 1 }} onClick={handleGuardar}>
+            {datos?.id ? 'Guardar cambios' : 'Crear descuento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// TAB MESAS
+// ════════════════════════════════════════════════════════════════════════════════
+
+function TabMesas({ mesas, onNueva, onEditar, onToggle }) {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-16">
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>
+            {mesas.filter(m => m.activo).length} mesas activas
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 2 }}>
+            Las mesas aparecen en el selector del Punto de Venta al iniciar un turno.
+          </div>
+        </div>
+        <button className="btn btn-primario" onClick={onNueva}>
+          ➕ Nueva mesa
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+        {mesas.map(m => (
+          <div
+            key={m.id}
+            style={{
+              padding: '14px 12px', borderRadius: 10,
+              background: 'var(--tarjeta)',
+              border: `2px solid ${m.activo ? 'var(--borde)' : 'var(--rojo)'}`,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 28 }}>🪑</span>
+            <div style={{ fontWeight: 700, textAlign: 'center' }}>{m.nombre}</div>
+            <span className={`badge ${m.activo ? 'badge-verde' : 'badge-rojo'}`}>
+              {m.activo ? 'Activa' : 'Inactiva'}
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-secundario" style={{ padding: '4px 8px', fontSize: 12 }}
+                onClick={() => onEditar(m)}>
+                ✏️
+              </button>
+              <button
+                className={`btn ${m.activo ? 'btn-peligro' : 'btn-exito'}`}
+                style={{ padding: '4px 8px', fontSize: 12 }}
+                onClick={() => onToggle(m.id)}
+              >
+                {m.activo ? '🚫' : '✅'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {mesas.length === 0 && (
+        <div className="vacio card">No hay mesas configuradas. Crea la primera con "Nueva mesa".</div>
+      )}
+    </div>
+  );
+}
+
+// ── Modal crear/editar mesa ────────────────────────────────────────────────────
+
+function ModalMesa({ datos, onGuardar, onCerrar }) {
+  const [form, setForm] = useState({
+    nombre:  datos?.nombre  || '',
+    numero:  datos?.numero  || 1,
+  });
+
+  const handleGuardar = () => {
+    if (!form.nombre.trim()) { alert('Ingresa un nombre para la mesa'); return; }
+    onGuardar({ id: datos?.id, ...form });
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ minWidth: 340 }}>
+        <div className="modal-titulo">
+          {datos?.id ? '✏️ Editar mesa' : '➕ Nueva mesa'}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!datos?.id && (
+            <div className="form-grupo">
+              <label className="form-label">Número de mesa</label>
+              <input type="number" min="1" value={form.numero}
+                onChange={e => setForm(p => ({ ...p, numero: parseInt(e.target.value) || 1,
+                  nombre: p.nombre === `Mesa ${p.numero}` ? `Mesa ${parseInt(e.target.value) || 1}` : p.nombre }))}
+                style={{ width: '100%' }} />
+            </div>
+          )}
+          <div className="form-grupo">
+            <label className="form-label">Nombre de la mesa</label>
+            <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
+              placeholder="Ej: Mesa terraza 1" style={{ width: '100%' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button className="btn btn-secundario" style={{ flex: 1 }} onClick={onCerrar}>Cancelar</button>
+          <button className="btn btn-primario" style={{ flex: 1 }} onClick={handleGuardar}>
+            {datos?.id ? 'Guardar' : 'Crear mesa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// TAB BASE DE CAJA
+// ════════════════════════════════════════════════════════════════════════════════
+
+function TabBaseCaja({ notificar }) {
+  const hoy = new Date().toISOString().split('T')[0];
+
+  const [historial,      setHistorial]      = useState([]);
+  const [baseHoy,        setBaseHoy]        = useState(null);
+  const [editando,       setEditando]       = useState(false);
+  const [efectivoEdit,   setEfectivoEdit]   = useState('');
+  const [nequiEdit,      setNequiEdit]      = useState('');
+  const [guardando,      setGuardando]      = useState(false);
+  const [cargando,       setCargando]       = useState(true);
+
+  const cargar = useCallback(async () => {
+    try {
+      const [hist, base] = await Promise.all([
+        window.electronAPI.getHistorialBaseCaja(),
+        window.electronAPI.getBaseCaja(hoy),
+      ]);
+      setHistorial(hist || []);
+      setBaseHoy(base || null);
+    } catch (err) {
+      console.error('[TabBaseCaja] Error:', err);
+    } finally {
+      setCargando(false);
+    }
+  }, [hoy]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const iniciarEdicion = () => {
+    setEfectivoEdit(baseHoy?.efectivo_base ?? '');
+    setNequiEdit(baseHoy?.nequi_base ?? '');
+    setEditando(true);
+  };
+
+  const guardarEdicion = async () => {
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      if (baseHoy) {
+        // Actualizar base existente
+        await window.electronAPI.updateBaseCaja({
+          fecha:         hoy,
+          efectivo_base: Math.round(parseFloat(efectivoEdit) || 0),
+          nequi_base:    Math.round(parseFloat(nequiEdit)    || 0),
+        });
+      } else {
+        // Registrar nueva base para hoy
+        await window.electronAPI.registrarBaseCaja({
+          fecha:         hoy,
+          empleado:      '',
+          efectivo_base: Math.round(parseFloat(efectivoEdit) || 0),
+          nequi_base:    Math.round(parseFloat(nequiEdit)    || 0),
+        });
+      }
+      notificar('✅ Base de caja actualizada', 'exito');
+      setEditando(false);
+      cargar();
+    } catch (err) {
+      notificar('❌ Error al guardar la base', 'error');
+      console.error('[TabBaseCaja] Error guardar:', err);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (cargando) return <div className="cargando">⏳ Cargando...</div>;
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      {/* Base del día actual */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-titulo">💵 Base de caja — Hoy ({hoy})</div>
+
+        {editando ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="form-grupo">
+              <label className="form-label">💵 Efectivo en caja al inicio ($)</label>
+              <input
+                type="number"
+                min="0"
+                value={efectivoEdit}
+                onChange={e => setEfectivoEdit(e.target.value)}
+                placeholder="0"
+                autoFocus
+              />
+            </div>
+            <div className="form-grupo">
+              <label className="form-label">📱 Saldo Nequi disponible ($)</label>
+              <input
+                type="number"
+                min="0"
+                value={nequiEdit}
+                onChange={e => setNequiEdit(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="btn btn-primario"
+                onClick={guardarEdicion}
+                disabled={guardando}
+              >
+                {guardando ? '⏳ Guardando...' : '✅ Guardar'}
+              </button>
+              <button
+                className="btn btn-secundario"
+                onClick={() => setEditando(false)}
+                disabled={guardando}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : baseHoy ? (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
+                <span style={{ color: 'var(--texto-suave)' }}>💵 Efectivo inicial</span>
+                <span style={{ fontWeight: 700 }}>${baseHoy.efectivo_base.toLocaleString('es-CO')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
+                <span style={{ color: 'var(--texto-suave)' }}>📱 Nequi inicial</span>
+                <span style={{ fontWeight: 700 }}>${baseHoy.nequi_base.toLocaleString('es-CO')}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--texto-suave)' }}>
+                Registrado por: {baseHoy.empleado || '—'} a las {new Date(baseHoy.registrado_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+            <button className="btn btn-secundario" onClick={iniciarEdicion}>
+              ✏️ Corregir base de hoy
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div className="alerta naranja" style={{ marginBottom: 16 }}>
+              No hay base de caja registrada para hoy.
+            </div>
+            <button className="btn btn-primario" onClick={iniciarEdicion}>
+              ➕ Registrar base de hoy
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Historial */}
+      <div className="card">
+        <div className="card-titulo">📅 Historial de bases registradas (últimos 30 días)</div>
+        {historial.length === 0 ? (
+          <div className="vacio">Sin registros aún</div>
+        ) : (
+          <div className="tabla-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Empleado</th>
+                  <th>Efectivo inicial</th>
+                  <th>Nequi inicial</th>
+                  <th>Hora registro</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historial.map(b => (
+                  <tr key={b.id}>
+                    <td>{b.fecha}</td>
+                    <td>{b.empleado || '—'}</td>
+                    <td className="negrita">${b.efectivo_base.toLocaleString('es-CO')}</td>
+                    <td>${b.nequi_base.toLocaleString('es-CO')}</td>
+                    <td style={{ fontSize: 12, color: 'var(--texto-suave)' }}>
+                      {new Date(b.registrado_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

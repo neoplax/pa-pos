@@ -5,6 +5,8 @@ export default function CierreCaja() {
   const { empleado, notificar } = useApp();
   const [ventasDia, setVentasDia]   = useState(null);
   const [cajaDia, setCajaDia]       = useState(null);
+  const [baseDia, setBaseDia]       = useState(null);
+  const [gastosDia, setGastosDia]   = useState({ gastos: [], compras: [], totalGastos: 0, totalCompras: 0 });
   const [historial, setHistorial]   = useState([]);
   const [cargando, setCargando]     = useState(true);
   const [cerrando, setCerrando]     = useState(false);
@@ -22,16 +24,20 @@ export default function CierreCaja() {
 
   const cargar = useCallback(async () => {
     try {
-      const [ventas, caja, hist, comprasHoy] = await Promise.all([
+      const [ventas, caja, hist, comprasHoy, base, gastosHoy] = await Promise.all([
         window.electronAPI.getVentasDia(hoy),
         window.electronAPI.getCajaDia(hoy),
         window.electronAPI.getHistorialCaja(),
         window.electronAPI.getComprasDia(hoy),
+        window.electronAPI.getBaseCaja(hoy),
+        window.electronAPI.getGastosDia(hoy),
       ]);
       setVentasDia(ventas);
       setCajaDia(caja);
       setHistorial(hist);
       setComprasDia(comprasHoy);
+      setBaseDia(base || null);
+      setGastosDia(gastosHoy || { gastos: [], compras: [], totalGastos: 0, totalCompras: 0 });
 
       // Pre-llenar si ya hay un cierre parcial
       if (caja) {
@@ -52,15 +58,44 @@ export default function CierreCaja() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const resumen  = ventasDia?.resumen || {};
+  const resumen     = ventasDia?.resumen || {};
   const totalVentas = resumen.total_ventas || 0;
+  const ventasEf    = resumen.total_efectivo || 0;
+  const ventasNq    = resumen.total_nequi    || 0;
 
-  const efectivoN = Math.round(parseFloat(efectivoContado) || 0);
-  const nequiN    = Math.round(parseFloat(nequiContado) || 0);
-  const gastosN   = Math.round(parseFloat(gastos) || 0);
+  const efectivoN   = Math.round(parseFloat(efectivoContado) || 0);
+  const nequiN      = Math.round(parseFloat(nequiContado)    || 0);
+  const gastosN     = Math.round(parseFloat(gastos)          || 0);
 
-  const utilidad  = totalVentas - gastosN;
-  const diferencia = (efectivoN + nequiN) - totalVentas;
+  const utilidad    = totalVentas - gastosN;
+
+  // Base del día
+  const baseEf = baseDia?.efectivo_base || 0;
+  const baseNq = baseDia?.nequi_base    || 0;
+
+  // Gastos + compras del día desglosados por método de pago
+  const calcEf = (arr, campoMonto = 'monto') =>
+    arr.reduce((s, g) => {
+      if (g.metodo_pago === 'efectivo') return s + (g[campoMonto] || 0);
+      if (g.metodo_pago === 'mixto')    return s + (g.monto_efectivo_mixto || 0);
+      return s;
+    }, 0);
+  const calcNq = (arr, campoMonto = 'monto') =>
+    arr.reduce((s, g) => {
+      if (g.metodo_pago === 'nequi') return s + (g[campoMonto] || 0);
+      if (g.metodo_pago === 'mixto') return s + (g.monto_nequi_mixto || 0);
+      return s;
+    }, 0);
+
+  const gastosEfDia = calcEf(gastosDia.gastos)         + calcEf(gastosDia.compras, 'precio_pagado');
+  const gastosNqDia = calcNq(gastosDia.gastos)         + calcNq(gastosDia.compras, 'precio_pagado');
+
+  // Efectivo/Nequi esperado = base + ventas del método - gastos del método
+  const esperadoEf  = baseEf + ventasEf - gastosEfDia;
+  const esperadoNq  = baseNq + ventasNq - gastosNqDia;
+  const difEfectivo = efectivoN - esperadoEf;
+  const difNequi    = nequiN    - esperadoNq;
+  const diferencia  = difEfectivo + difNequi;
 
   const cerrarCaja = async () => {
     if (cerrando) return;
@@ -167,11 +202,30 @@ export default function CierreCaja() {
               <div className="alerta verde" style={{ marginBottom: 12 }}>
                 Caja cerrada el {new Date(cajaDia.creado_en).toLocaleString('es-CO')}
               </div>
-              <FilaResumen label="Efectivo contado"   valor={`$${cajaDia.efectivo.toLocaleString('es-CO')}`} />
-              <FilaResumen label="Nequi"              valor={`$${cajaDia.nequi.toLocaleString('es-CO')}`} />
-              <FilaResumen label="Gastos del día"     valor={`$${cajaDia.gastos.toLocaleString('es-CO')}`} />
+
+              {/* Desglose efectivo */}
+              <DesgloseCuadre
+                label="💵 Efectivo"
+                base={baseEf}
+                ventas={ventasEf}
+                gastos={gastosEfDia}
+                contado={cajaDia.efectivo}
+              />
+              <div style={{ margin: '10px 0' }} />
+              {/* Desglose Nequi */}
+              <DesgloseCuadre
+                label="📱 Nequi"
+                base={baseNq}
+                ventas={ventasNq}
+                gastos={gastosNqDia}
+                contado={cajaDia.nequi}
+              />
+
               <hr className="divider" />
-              <FilaResumen label="UTILIDAD"           valor={`$${cajaDia.utilidad.toLocaleString('es-CO')}`} destacado />
+              <FilaResumen label="Total ventas"   valor={`$${cajaDia.total_ventas.toLocaleString('es-CO')}`} />
+              <FilaResumen label="Gastos del día" valor={`-$${cajaDia.gastos.toLocaleString('es-CO')}`} />
+              <FilaResumen label="UTILIDAD"       valor={`$${cajaDia.utilidad.toLocaleString('es-CO')}`} destacado />
+
               {(cajaDia.descuadre !== undefined && cajaDia.descuadre !== 0) && (
                 <div style={{
                   padding: '8px 12px', borderRadius: 8, marginTop: 8,
@@ -180,8 +234,8 @@ export default function CierreCaja() {
                   color: cajaDia.descuadre >= 0 ? 'var(--verde)' : 'var(--rojo)',
                 }}>
                   {cajaDia.descuadre >= 0
-                    ? `✅ Sobrante: $${cajaDia.descuadre.toLocaleString('es-CO')}`
-                    : `⚠️ Faltante: $${Math.abs(cajaDia.descuadre).toLocaleString('es-CO')}`
+                    ? `✅ Sobrante total: $${cajaDia.descuadre.toLocaleString('es-CO')}`
+                    : `⚠️ Faltante total: $${Math.abs(cajaDia.descuadre).toLocaleString('es-CO')}`
                   }
                   {cajaDia.observacion_descuadre && (
                     <div style={{ fontWeight: 400, marginTop: 4 }}>{cajaDia.observacion_descuadre}</div>
@@ -204,6 +258,13 @@ export default function CierreCaja() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Aviso si no hay base de caja registrada hoy */}
+              {!baseDia && (
+                <div className="alerta naranja" style={{ fontSize: 12 }}>
+                  ⚠️ No hay base de caja registrada para hoy. El cuadre se hará sin efectivo/Nequi inicial.
+                </div>
+              )}
+
               <div className="form-grupo">
                 <label className="form-label">💵 Efectivo contado ($)</label>
                 <input
@@ -266,34 +327,55 @@ export default function CierreCaja() {
 
               <hr className="divider" />
 
-              {/* Cálculo automático */}
+              {/* Desglose de cuadre por método de pago */}
+              <DesgloseCuadre
+                label="💵 Efectivo"
+                base={baseEf}
+                ventas={ventasEf}
+                gastos={gastosEfDia}
+                contado={efectivoN}
+              />
+              <div style={{ margin: '6px 0' }} />
+              <DesgloseCuadre
+                label="📱 Nequi"
+                base={baseNq}
+                ventas={ventasNq}
+                gastos={gastosNqDia}
+                contado={nequiN}
+              />
+
+              <hr className="divider" />
+
+              {/* Resumen de utilidad */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <FilaResumen label="Total ventas"   valor={`$${totalVentas.toLocaleString('es-CO')}`} />
                 <FilaResumen label="Gastos"         valor={`-$${gastosN.toLocaleString('es-CO')}`}     />
                 <FilaResumen label="UTILIDAD"       valor={`$${utilidad.toLocaleString('es-CO')}`}     destacado />
-                <div style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: diferencia >= 0 ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: diferencia >= 0 ? 'var(--verde)' : 'var(--rojo)',
-                }}>
-                  {diferencia >= 0
-                    ? `✅ Sobrante: $${diferencia.toLocaleString('es-CO')}`
-                    : `⚠️ Faltante: $${Math.abs(diferencia).toLocaleString('es-CO')}`
-                  }
-                </div>
-                {Math.abs(diferencia) > 0 && (
-                  <div className="form-grupo" style={{ marginTop: 4 }}>
-                    <label className="form-label">Observación del descuadre</label>
-                    <input
-                      type="text"
-                      value={obsDescuadre}
-                      onChange={e => setObsDescuadre(e.target.value)}
-                      placeholder="¿Por qué hay diferencia?"
-                    />
-                  </div>
+
+                {/* Diferencia total */}
+                {(Math.abs(difEfectivo) > 0 || Math.abs(difNequi) > 0) && (
+                  <>
+                    <div style={{
+                      padding: '8px 12px', borderRadius: 8,
+                      background: diferencia >= 0 ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)',
+                      fontSize: 14, fontWeight: 600,
+                      color: diferencia >= 0 ? 'var(--verde)' : 'var(--rojo)',
+                    }}>
+                      {diferencia >= 0
+                        ? `✅ Sobrante total: $${diferencia.toLocaleString('es-CO')}`
+                        : `⚠️ Faltante total: $${Math.abs(diferencia).toLocaleString('es-CO')}`
+                      }
+                    </div>
+                    <div className="form-grupo" style={{ marginTop: 4 }}>
+                      <label className="form-label">Observación del descuadre</label>
+                      <input
+                        type="text"
+                        value={obsDescuadre}
+                        onChange={e => setObsDescuadre(e.target.value)}
+                        placeholder="¿Por qué hay diferencia?"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -373,6 +455,47 @@ function FilaResumen({ label, valor, destacado = false }) {
     }}>
       <span style={{ color: destacado ? 'var(--naranja)' : 'var(--texto-suave)' }}>{label}</span>
       <span>{valor}</span>
+    </div>
+  );
+}
+
+// Muestra el desglose de cuadre para un método de pago (efectivo o nequi)
+function DesgloseCuadre({ label, base, ventas, gastos, contado }) {
+  const fmt   = n => `$${Math.abs(n).toLocaleString('es-CO')}`;
+  const esp   = base + ventas - gastos;
+  const dif   = contado - esp;
+  const color = dif >= 0 ? 'var(--verde)' : 'var(--rojo)';
+
+  return (
+    <div style={{
+      background: 'var(--fondo)', borderRadius: 10, padding: '10px 14px',
+      fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{ fontWeight: 700, color: 'var(--naranja)', marginBottom: 4 }}>{label}</div>
+      <FilaResumen label="Saldo inicial"        valor={fmt(base)} />
+      <FilaResumen label="+ Ventas del método"  valor={fmt(ventas)} />
+      <FilaResumen label="− Gastos del método"  valor={fmt(gastos)} />
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontWeight: 700, borderTop: '1px solid var(--borde)', paddingTop: 4, marginTop: 2,
+      }}>
+        <span style={{ color: 'var(--texto-suave)' }}>= Esperado en caja</span>
+        <span>{fmt(esp)}</span>
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 13, color: 'var(--texto-suave)',
+      }}>
+        <span>Contado físico</span>
+        <span style={{ color: 'var(--texto)' }}>{fmt(contado)}</span>
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontWeight: 700, color,
+      }}>
+        <span>Diferencia</span>
+        <span>{dif >= 0 ? `+${fmt(dif)}` : `-${fmt(dif)}`}</span>
+      </div>
     </div>
   );
 }

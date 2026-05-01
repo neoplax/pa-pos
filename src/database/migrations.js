@@ -244,6 +244,9 @@ function runMigrations(db) {
   // Método de pago en compras (para saldo disponible)
   try { db.exec('ALTER TABLE compras ADD COLUMN metodo_pago TEXT NOT NULL DEFAULT "efectivo"'); } catch(_) {}
 
+  // Notas de unidad en ingredientes (ej. "Paquete de 32 tiras = $15.000")
+  try { db.exec('ALTER TABLE ingredientes ADD COLUMN notas_unidad TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+
   // Pago mixto en gastos y compras
   try { db.exec('ALTER TABLE gastos ADD COLUMN monto_efectivo_mixto INTEGER NOT NULL DEFAULT 0'); } catch(_) {}
   try { db.exec('ALTER TABLE gastos ADD COLUMN monto_nequi_mixto INTEGER NOT NULL DEFAULT 0'); } catch(_) {}
@@ -254,6 +257,91 @@ function runMigrations(db) {
   try { db.exec('ALTER TABLE empleados ADD COLUMN rol TEXT NOT NULL DEFAULT "empleado"'); } catch(_) {}
   try { db.exec('ALTER TABLE empleados ADD COLUMN fecha_ingreso TEXT NOT NULL DEFAULT ""'); } catch(_) {}
   try { db.exec('ALTER TABLE empleados ADD COLUMN notas TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+
+  // ── PARTE 7: Descuentos, Mesas y Domicilios externos ─────────────────────────
+
+  // Tabla de descuentos configurables
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS descuentos (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre       TEXT    NOT NULL,
+      tipo         TEXT    NOT NULL DEFAULT 'porcentaje', -- porcentaje | fijo | gratis
+      valor        REAL    NOT NULL DEFAULT 0,            -- % si porcentaje, $ si fijo
+      descripcion  TEXT    NOT NULL DEFAULT '',
+      activo       INTEGER NOT NULL DEFAULT 1,
+      fecha_inicio TEXT    DEFAULT NULL,
+      fecha_fin    TEXT    DEFAULT NULL,
+      aplica_a     TEXT    NOT NULL DEFAULT 'total',      -- total | producto
+      dias_semana  TEXT    NOT NULL DEFAULT '',           -- JSON [0..6], 0=domingo; vacío=todos
+      hora_inicio  TEXT    NOT NULL DEFAULT '',           -- HH:MM; vacío=sin restricción
+      hora_fin     TEXT    NOT NULL DEFAULT '',
+      creado_en    TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+  `);
+
+  // Tabla de mesas / cuentas simultáneas
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mesas (
+      id     INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero INTEGER NOT NULL,
+      nombre TEXT    NOT NULL DEFAULT '',
+      activo INTEGER NOT NULL DEFAULT 1
+    );
+
+    -- Pedidos en curso (carrito persistente por mesa)
+    CREATE TABLE IF NOT EXISTS pedidos_pendientes (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      mesa_id         INTEGER NOT NULL DEFAULT 0,  -- 0 = para llevar
+      mesa_nombre     TEXT    NOT NULL DEFAULT '',
+      empleado        TEXT    NOT NULL DEFAULT '',
+      items           TEXT    NOT NULL DEFAULT '[]', -- JSON
+      actualizado_en  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+
+    -- Índice para consulta rápida por mesa
+    CREATE INDEX IF NOT EXISTS idx_pedidos_mesa ON pedidos_pendientes(mesa_id);
+  `);
+
+  // Columnas nuevas en ventas para los tres módulos
+  try { db.exec('ALTER TABLE ventas ADD COLUMN descuento_id INTEGER DEFAULT NULL'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN descuento_valor INTEGER NOT NULL DEFAULT 0'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN descuento_nombre TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN mesa_id INTEGER DEFAULT NULL'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN mesa_nombre TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN plataforma_domicilio TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN numero_orden_domicilio TEXT NOT NULL DEFAULT ""'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN comision_domicilio_pct REAL NOT NULL DEFAULT 0'); } catch(_) {}
+  try { db.exec('ALTER TABLE ventas ADD COLUMN comision_domicilio_valor INTEGER NOT NULL DEFAULT 0'); } catch(_) {}
+
+  // Insertar 8 mesas por defecto si la tabla está vacía
+  const mesasExistentes = db.prepare('SELECT COUNT(*) as n FROM mesas').get();
+  if (mesasExistentes.n === 0) {
+    const ins = db.prepare('INSERT INTO mesas (numero, nombre) VALUES (?, ?)');
+    for (let i = 1; i <= 8; i++) {
+      ins.run(i, `Mesa ${i}`);
+    }
+  }
+
+  // Insertar descuentos iniciales si la tabla está vacía
+  const descExistentes = db.prepare('SELECT COUNT(*) as n FROM descuentos').get();
+  if (descExistentes.n === 0) {
+    db.prepare(`
+      INSERT INTO descuentos (nombre, tipo, valor, descripcion, activo, dias_semana, hora_inicio, hora_fin)
+      VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    `).run('Promo Seguidor', 'porcentaje', 10, '10% de descuento para seguidores en redes', '', '', '');
+
+    db.prepare(`
+      INSERT INTO descuentos (nombre, tipo, valor, descripcion, activo, dias_semana, hora_inicio, hora_fin)
+      VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    `).run('Estudiante 12-14h', 'porcentaje', 15,
+      '15% de descuento para estudiantes entre semana al mediodía',
+      JSON.stringify([1,2,3,4,5]), '12:00', '14:00');
+
+    db.prepare(`
+      INSERT INTO descuentos (nombre, tipo, valor, descripcion, activo, dias_semana, hora_inicio, hora_fin)
+      VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    `).run('Combo Especial', 'fijo', 1000, 'Descuento fijo de $1.000', '', '', '');
+  }
 
   // Columnas adicionales ingredientes (parte 3)
   try { db.exec('ALTER TABLE ingredientes ADD COLUMN proveedor_id INTEGER DEFAULT NULL'); } catch(_) {}
@@ -292,6 +380,19 @@ function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_bajas_fecha  ON bajas(fecha);
     CREATE INDEX IF NOT EXISTS idx_gastos_fecha ON gastos(fecha);
+  `);
+
+  // ── BASE DE CAJA: saldo inicial al abrir el turno ────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS base_caja (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha          TEXT    NOT NULL UNIQUE,
+      empleado       TEXT    NOT NULL DEFAULT '',
+      efectivo_base  INTEGER NOT NULL DEFAULT 0,
+      nequi_base     INTEGER NOT NULL DEFAULT 0,
+      registrado_at  TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_base_caja_fecha ON base_caja(fecha);
   `);
 
   console.log('[DB] Migraciones completadas.');

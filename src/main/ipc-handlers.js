@@ -8,7 +8,7 @@ const {
   seedDatabase, patchBebidas, patchDesechables, patchProveedores, patchCodigos,
   patchEmpleados, patchCorrecciones, patchProductosEmpaque,
   patchCostosIngredientes, patchRecetasV2, patchDatosHistoricos,
-  patchRolesEmpleados, patchUnidadesV2, patchLimpiezaDatosPrueba,
+  patchRolesEmpleados, patchUnidadesV2, patchLimpiezaDatosPrueba, patchTocinetaV3,
 } = require('../database/seed');
 const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters } = require('./print-service');
 const syncService = require('../sync/syncService');
@@ -34,6 +34,7 @@ function setupIpcHandlers() {
   patchRolesEmpleados(db);
   patchUnidadesV2(db);
   patchLimpiezaDatosPrueba(db);
+  patchTocinetaV3(db);
 
   // ── PRODUCTOS ─────────────────────────────────────────────────────────────
 
@@ -132,14 +133,13 @@ function setupIpcHandlers() {
     } = datos;
     db.prepare(`
       UPDATE ingredientes SET
-        nombre=?, categoria=?, unidad=?, stock_minimo=?, stock_actual=?,
+        nombre=?, categoria=?, unidad=?, stock_minimo=?,
         costo_unitario=?, es_perecedero=?, duracion_dias=?,
         unidades_por_paquete=?, proveedor_id=?
       WHERE id=?
     `).run(
       nombre, categoria, unidad,
       parseFloat(stock_minimo) || 0,
-      parseFloat(stock_actual) || 0,
       parseFloat(costo_unitario) || 0,
       es_perecedero ? 1 : 0,
       duracion_dias || null,
@@ -183,12 +183,34 @@ function setupIpcHandlers() {
       empleado, items, metodo_pago, total,
       monto_efectivo_mixto = 0, monto_nequi_mixto = 0,
       domicilio = 0, efectivo_recibido = 0,
+      // Módulo descuentos
+      descuento_id = null, descuento_valor = 0, descuento_nombre = '',
+      // Módulo mesas
+      mesa_id = null, mesa_nombre = '',
+      // Módulo domicilios externos
+      plataforma_domicilio = '', numero_orden_domicilio = '',
+      comision_domicilio_pct = 0, comision_domicilio_valor = 0,
     } = ventaData;
 
     const transaccion = db.transaction(() => {
-      const venta = db.prepare(
-        'INSERT INTO ventas (empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, domicilio, efectivo_recibido) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, domicilio, efectivo_recibido);
+      const venta = db.prepare(`
+        INSERT INTO ventas
+          (empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto,
+           domicilio, efectivo_recibido,
+           descuento_id, descuento_valor, descuento_nombre,
+           mesa_id, mesa_nombre,
+           plataforma_domicilio, numero_orden_domicilio,
+           comision_domicilio_pct, comision_domicilio_valor)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(
+        empleado, total, metodo_pago,
+        monto_efectivo_mixto, monto_nequi_mixto,
+        domicilio, efectivo_recibido,
+        descuento_id || null, Math.round(descuento_valor || 0), descuento_nombre || '',
+        mesa_id || null, mesa_nombre || '',
+        plataforma_domicilio || '', numero_orden_domicilio || '',
+        parseFloat(comision_domicilio_pct || 0), Math.round(comision_domicilio_valor || 0),
+      );
 
       const ventaId = venta.lastInsertRowid;
 
@@ -226,6 +248,11 @@ function setupIpcHandlers() {
       if (k1Ing) {
         db.prepare('UPDATE ingredientes SET stock_actual = MAX(0, stock_actual - 1) WHERE id = ?')
           .run(k1Ing.id);
+      }
+
+      // Liberar el pedido pendiente de la mesa al cobrar
+      if (mesa_id) {
+        db.prepare('DELETE FROM pedidos_pendientes WHERE mesa_id = ?').run(mesa_id);
       }
 
       return ventaId;
@@ -348,6 +375,43 @@ function setupIpcHandlers() {
     `).all();
   });
 
+  // ── BASE DE CAJA ──────────────────────────────────────────────────────────
+
+  ipcMain.handle('db:getBaseCaja', (_, fecha) => {
+    return db.prepare('SELECT * FROM base_caja WHERE fecha = ?').get(fecha) || null;
+  });
+
+  ipcMain.handle('db:registrarBaseCaja', (_, { fecha, empleado, efectivo_base, nequi_base }) => {
+    // INSERT OR REPLACE para idempotencia (por si se llama dos veces)
+    db.prepare(`
+      INSERT INTO base_caja (fecha, empleado, efectivo_base, nequi_base)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(fecha) DO UPDATE SET
+        empleado=excluded.empleado,
+        efectivo_base=excluded.efectivo_base,
+        nequi_base=excluded.nequi_base,
+        registrado_at=datetime('now','localtime')
+    `).run(fecha, empleado || '', Math.round(efectivo_base) || 0, Math.round(nequi_base) || 0);
+    return { ok: true };
+  });
+
+  ipcMain.handle('db:updateBaseCaja', (_, { fecha, efectivo_base, nequi_base }) => {
+    const fila = db.prepare('SELECT id FROM base_caja WHERE fecha = ?').get(fecha);
+    if (!fila) return { ok: false, error: 'No hay base registrada para esa fecha' };
+    db.prepare(`
+      UPDATE base_caja
+      SET efectivo_base=?, nequi_base=?, registrado_at=datetime('now','localtime')
+      WHERE fecha=?
+    `).run(Math.round(efectivo_base) || 0, Math.round(nequi_base) || 0, fecha);
+    return { ok: true };
+  });
+
+  ipcMain.handle('db:getHistorialBaseCaja', () => {
+    return db.prepare(`
+      SELECT * FROM base_caja ORDER BY fecha DESC LIMIT 30
+    `).all();
+  });
+
   // ── CAJA ──────────────────────────────────────────────────────────────────
 
   ipcMain.handle('db:getCajaDia', (_, fecha) => {
@@ -363,8 +427,47 @@ function setupIpcHandlers() {
       'SELECT COALESCE(SUM(total), 0) as total_ventas FROM ventas WHERE fecha BETWEEN ? AND ?'
     ).get(inicio, fin);
 
-    const utilidad   = total_ventas - gastos;
-    const descuadre  = (efectivo + nequi) - total_ventas;
+    const utilidad = total_ventas - gastos;
+
+    // Base del día para calcular descuadre por método de pago
+    const base       = db.prepare('SELECT * FROM base_caja WHERE fecha = ?').get(fecha);
+    const baseEf     = base?.efectivo_base || 0;
+    const baseNq     = base?.nequi_base    || 0;
+
+    const ventasEf   = db.prepare(`
+      SELECT COALESCE(
+        SUM(CASE WHEN metodo_pago='efectivo' THEN total            ELSE 0 END) +
+        SUM(CASE WHEN metodo_pago='mixto'    THEN monto_efectivo_mixto ELSE 0 END), 0
+      ) as v FROM ventas WHERE fecha BETWEEN ? AND ?
+    `).get(inicio, fin).v;
+
+    const ventasNq   = db.prepare(`
+      SELECT COALESCE(
+        SUM(CASE WHEN metodo_pago='nequi' THEN total           ELSE 0 END) +
+        SUM(CASE WHEN metodo_pago='mixto' THEN monto_nequi_mixto ELSE 0 END), 0
+      ) as v FROM ventas WHERE fecha BETWEEN ? AND ?
+    `).get(inicio, fin).v;
+
+    const gastosEfDia = db.prepare(`
+      SELECT COALESCE(
+        SUM(CASE WHEN metodo_pago='efectivo' THEN monto                         ELSE 0 END) +
+        SUM(CASE WHEN metodo_pago='mixto'    THEN COALESCE(monto_efectivo_mixto,0) ELSE 0 END), 0
+      ) as v FROM gastos WHERE fecha BETWEEN ? AND ?
+    `).get(inicio, fin).v;
+
+    const gastosNqDia = db.prepare(`
+      SELECT COALESCE(
+        SUM(CASE WHEN metodo_pago='nequi' THEN monto                         ELSE 0 END) +
+        SUM(CASE WHEN metodo_pago='mixto' THEN COALESCE(monto_nequi_mixto,0) ELSE 0 END), 0
+      ) as v FROM gastos WHERE fecha BETWEEN ? AND ?
+    `).get(inicio, fin).v;
+
+    // Esperado = base + ventas del día - gastos del día (por método)
+    const esperadoEf = baseEf + ventasEf - gastosEfDia;
+    const esperadoNq = baseNq + ventasNq - gastosNqDia;
+
+    // Descuadre total = diferencia efectivo + diferencia nequi
+    const descuadre  = (efectivo - esperadoEf) + (nequi - esperadoNq);
     const cajaDia    = db.prepare('SELECT id FROM caja WHERE fecha = ?').get(fecha);
 
     if (cajaDia) {
@@ -589,6 +692,9 @@ function setupIpcHandlers() {
       monto_efectivo_mixto: venta.monto_efectivo_mixto,
       monto_nequi_mixto:    venta.monto_nequi_mixto,
       efectivo_recibido:    efectivo_recibido || venta.efectivo_recibido || 0,
+      descuento_valor:      venta.descuento_valor || 0,
+      descuento_nombre:     venta.descuento_nombre || '',
+      mesa_nombre:          venta.mesa_nombre || '',
       printerName,
       puertoLinux,
     });
@@ -888,13 +994,21 @@ function setupIpcHandlers() {
       ) as total FROM compras
     `).get().total;
 
-    const saldoEfectivo = ventasEfectivo - gastosEfectivo - comprasEfectivo;
-    const saldoNequi    = ventasNequi - gastosNequi - comprasNequi;
+    // Base de caja del día actual (si fue registrada)
+    const hoy         = new Date().toISOString().split('T')[0];
+    const baseHoy     = db.prepare('SELECT * FROM base_caja WHERE fecha = ?').get(hoy);
+    const baseEfHoy   = baseHoy?.efectivo_base || 0;
+    const baseNqHoy   = baseHoy?.nequi_base    || 0;
+
+    const saldoEfectivo = baseEfHoy + ventasEfectivo - gastosEfectivo - comprasEfectivo;
+    const saldoNequi    = baseNqHoy + ventasNequi    - gastosNequi    - comprasNequi;
 
     return {
       efectivo: saldoEfectivo,
       nequi:    saldoNequi,
       total:    saldoEfectivo + saldoNequi,
+      baseEfectivo: baseEfHoy,
+      baseNequi:    baseNqHoy,
       detalle: {
         ventasEfectivo, gastosEfectivo, comprasEfectivo,
         ventasNequi, gastosNequi, comprasNequi,
@@ -951,7 +1065,11 @@ function setupIpcHandlers() {
       FROM ventas WHERE fecha BETWEEN ? AND ?
     `).get(inicio, fin);
     const lista = db.prepare(`
-      SELECT id, fecha, empleado, total, domicilio, metodo_pago, factura_num
+      SELECT id, fecha, empleado, total, domicilio, metodo_pago, factura_num,
+             COALESCE(plataforma_domicilio,'') as plataforma_domicilio,
+             COALESCE(numero_orden_domicilio,'') as numero_orden_domicilio,
+             COALESCE(comision_domicilio_pct,0) as comision_domicilio_pct,
+             COALESCE(comision_domicilio_valor,0) as comision_domicilio_valor
       FROM ventas WHERE domicilio > 0 AND fecha BETWEEN ? AND ?
       ORDER BY fecha DESC
     `).all(inicio, fin);
@@ -1092,6 +1210,234 @@ function setupIpcHandlers() {
   ipcMain.handle('app:reiniciar', () => {
     app.relaunch();
     app.exit(0);
+  });
+
+  // ── DESCUENTOS ────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('db:getDescuentos', () => {
+    return db.prepare('SELECT * FROM descuentos ORDER BY nombre').all();
+  });
+
+  // Devuelve solo los descuentos válidos en el momento actual (para aplicar en POS)
+  ipcMain.handle('db:getDescuentosActivos', () => {
+    const todos = db.prepare('SELECT * FROM descuentos WHERE activo = 1').all();
+    const ahora = new Date();
+    const diaSemana = ahora.getDay(); // 0=domingo ... 6=sábado
+    const horaActual = `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+    const fechaHoy = ahora.toISOString().split('T')[0];
+
+    return todos.filter(d => {
+      // Verificar rango de fechas si está definido
+      if (d.fecha_inicio && fechaHoy < d.fecha_inicio) return false;
+      if (d.fecha_fin   && fechaHoy > d.fecha_fin)    return false;
+
+      // Verificar días de semana si está definido
+      if (d.dias_semana && d.dias_semana.trim() !== '') {
+        try {
+          const dias = JSON.parse(d.dias_semana);
+          if (Array.isArray(dias) && dias.length > 0 && !dias.includes(diaSemana)) return false;
+        } catch(_) {}
+      }
+
+      // Verificar horario si está definido
+      if (d.hora_inicio && d.hora_fin && d.hora_inicio !== '' && d.hora_fin !== '') {
+        if (horaActual < d.hora_inicio || horaActual >= d.hora_fin) return false;
+      }
+
+      return true;
+    });
+  });
+
+  ipcMain.handle('db:agregarDescuento', (_, datos) => {
+    const { nombre, tipo, valor, descripcion, activo, fecha_inicio, fecha_fin,
+            aplica_a, dias_semana, hora_inicio, hora_fin } = datos;
+    const r = db.prepare(`
+      INSERT INTO descuentos
+        (nombre, tipo, valor, descripcion, activo, fecha_inicio, fecha_fin,
+         aplica_a, dias_semana, hora_inicio, hora_fin)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    `).run(
+      nombre, tipo || 'porcentaje', parseFloat(valor) || 0,
+      descripcion || '', activo !== undefined ? (activo ? 1 : 0) : 1,
+      fecha_inicio || null, fecha_fin || null,
+      aplica_a || 'total',
+      dias_semana ? JSON.stringify(dias_semana) : '',
+      hora_inicio || '', hora_fin || '',
+    );
+    return { ok: true, id: r.lastInsertRowid };
+  });
+
+  ipcMain.handle('db:updateDescuento', (_, id, datos) => {
+    const { nombre, tipo, valor, descripcion, activo, fecha_inicio, fecha_fin,
+            aplica_a, dias_semana, hora_inicio, hora_fin } = datos;
+    db.prepare(`
+      UPDATE descuentos SET
+        nombre=?, tipo=?, valor=?, descripcion=?, activo=?,
+        fecha_inicio=?, fecha_fin=?, aplica_a=?,
+        dias_semana=?, hora_inicio=?, hora_fin=?
+      WHERE id=?
+    `).run(
+      nombre, tipo || 'porcentaje', parseFloat(valor) || 0,
+      descripcion || '', activo ? 1 : 0,
+      fecha_inicio || null, fecha_fin || null,
+      aplica_a || 'total',
+      dias_semana ? JSON.stringify(dias_semana) : '',
+      hora_inicio || '', hora_fin || '', id,
+    );
+    return { ok: true };
+  });
+
+  ipcMain.handle('db:toggleDescuento', (_, id) => {
+    db.prepare('UPDATE descuentos SET activo = CASE WHEN activo=1 THEN 0 ELSE 1 END WHERE id=?').run(id);
+    return { ok: true };
+  });
+
+  ipcMain.handle('db:eliminarDescuento', (_, id) => {
+    db.prepare('DELETE FROM descuentos WHERE id=?').run(id);
+    return { ok: true };
+  });
+
+  // ── MESAS ─────────────────────────────────────────────────────────────────────
+
+  ipcMain.handle('db:getMesas', () => {
+    const mesas = db.prepare('SELECT * FROM mesas WHERE activo=1 ORDER BY numero').all();
+    // Anotar estado: tiene pedido pendiente activo
+    const pendientes = db.prepare('SELECT mesa_id, items FROM pedidos_pendientes').all();
+    const mapPend = {};
+    for (const p of pendientes) {
+      let total = 0;
+      try {
+        const items = JSON.parse(p.items || '[]');
+        total = items.reduce((s, i) => s + (i.precio || 0) * (i.cantidad || 0), 0);
+      } catch(_) {}
+      mapPend[p.mesa_id] = total;
+    }
+    return mesas.map(m => ({
+      ...m,
+      estado: mapPend[m.id] !== undefined ? 'activo' : 'libre',
+      total_parcial: mapPend[m.id] || 0,
+    }));
+  });
+
+  ipcMain.handle('db:agregarMesa', (_, datos) => {
+    const { numero, nombre } = datos;
+    const r = db.prepare('INSERT INTO mesas (numero, nombre) VALUES (?,?)').run(numero, nombre || `Mesa ${numero}`);
+    return { ok: true, id: r.lastInsertRowid };
+  });
+
+  ipcMain.handle('db:updateMesa', (_, id, datos) => {
+    const { nombre } = datos;
+    db.prepare('UPDATE mesas SET nombre=? WHERE id=?').run(nombre, id);
+    return { ok: true };
+  });
+
+  ipcMain.handle('db:toggleMesa', (_, id) => {
+    db.prepare('UPDATE mesas SET activo = CASE WHEN activo=1 THEN 0 ELSE 1 END WHERE id=?').run(id);
+    return { ok: true };
+  });
+
+  // Guardar carrito en curso para una mesa
+  ipcMain.handle('db:guardarPedidoPendiente', (_, { mesa_id, mesa_nombre, empleado, items }) => {
+    const existe = db.prepare('SELECT id FROM pedidos_pendientes WHERE mesa_id=?').get(mesa_id);
+    if (existe) {
+      db.prepare(`
+        UPDATE pedidos_pendientes
+        SET mesa_nombre=?, empleado=?, items=?, actualizado_en=datetime('now','localtime')
+        WHERE mesa_id=?
+      `).run(mesa_nombre || '', empleado || '', JSON.stringify(items || []), mesa_id);
+    } else {
+      db.prepare(`
+        INSERT INTO pedidos_pendientes (mesa_id, mesa_nombre, empleado, items)
+        VALUES (?,?,?,?)
+      `).run(mesa_id, mesa_nombre || '', empleado || '', JSON.stringify(items || []));
+    }
+    return { ok: true };
+  });
+
+  // Obtener carrito guardado de una mesa
+  ipcMain.handle('db:getPedidoPendiente', (_, mesa_id) => {
+    const row = db.prepare('SELECT * FROM pedidos_pendientes WHERE mesa_id=?').get(mesa_id);
+    if (!row) return null;
+    try { row.items = JSON.parse(row.items || '[]'); } catch(_) { row.items = []; }
+    return row;
+  });
+
+  // Eliminar pedido pendiente (al cancelar o vaciar mesa)
+  ipcMain.handle('db:eliminarPedidoPendiente', (_, mesa_id) => {
+    db.prepare('DELETE FROM pedidos_pendientes WHERE mesa_id=?').run(mesa_id);
+    return { ok: true };
+  });
+
+  // ── DESCUENTOS EN REPORTES ────────────────────────────────────────────────────
+
+  ipcMain.handle('db:getReporteDescuentos', (_, { fechaInicio, fechaFin }) => {
+    const inicio = `${fechaInicio} 00:00:00`;
+    const fin    = `${fechaFin} 23:59:59`;
+
+    // Total descontado por período
+    const resumen = db.prepare(`
+      SELECT
+        COUNT(CASE WHEN descuento_valor > 0 THEN 1 END) as ventas_con_descuento,
+        COALESCE(SUM(descuento_valor), 0) as total_descontado,
+        COALESCE(AVG(CASE WHEN descuento_valor > 0 THEN descuento_valor END), 0) as promedio_descuento
+      FROM ventas WHERE fecha BETWEEN ? AND ?
+    `).get(inicio, fin);
+
+    // Desglose por nombre de descuento
+    const porDescuento = db.prepare(`
+      SELECT descuento_nombre,
+             COUNT(*) as usos,
+             COALESCE(SUM(descuento_valor), 0) as total_descontado
+      FROM ventas
+      WHERE descuento_valor > 0 AND fecha BETWEEN ? AND ?
+      GROUP BY descuento_nombre
+      ORDER BY total_descontado DESC
+    `).all(inicio, fin);
+
+    return { resumen, porDescuento };
+  });
+
+  // ── DOMICILIOS EXTERNOS EN REPORTES ──────────────────────────────────────────
+
+  ipcMain.handle('db:getReporteDomiciliosExternos', (_, { fechaInicio, fechaFin }) => {
+    const inicio = `${fechaInicio} 00:00:00`;
+    const fin    = `${fechaFin} 23:59:59`;
+
+    // Pedidos con plataforma externa
+    const externos = db.prepare(`
+      SELECT plataforma_domicilio, numero_orden_domicilio,
+             total, comision_domicilio_pct, comision_domicilio_valor,
+             (total - comision_domicilio_valor) as valor_neto,
+             fecha, factura_num
+      FROM ventas
+      WHERE plataforma_domicilio != '' AND fecha BETWEEN ? AND ?
+      ORDER BY fecha DESC
+    `).all(inicio, fin);
+
+    // Resumen por plataforma
+    const porPlataforma = db.prepare(`
+      SELECT plataforma_domicilio,
+             COUNT(*) as pedidos,
+             COALESCE(SUM(total), 0) as total_bruto,
+             COALESCE(SUM(comision_domicilio_valor), 0) as total_comisiones,
+             COALESCE(SUM(total - comision_domicilio_valor), 0) as ingreso_neto
+      FROM ventas
+      WHERE plataforma_domicilio != '' AND fecha BETWEEN ? AND ?
+      GROUP BY plataforma_domicilio
+      ORDER BY total_bruto DESC
+    `).all(inicio, fin);
+
+    // Domicilios propios (sin plataforma externa)
+    const propios = db.prepare(`
+      SELECT COUNT(*) as pedidos,
+             COALESCE(SUM(domicilio), 0) as total_domicilios,
+             COALESCE(SUM(total), 0) as total_ventas
+      FROM ventas
+      WHERE domicilio > 0 AND (plataforma_domicilio = '' OR plataforma_domicilio IS NULL)
+        AND fecha BETWEEN ? AND ?
+    `).get(inicio, fin);
+
+    return { externos, porPlataforma, propios };
   });
 }
 

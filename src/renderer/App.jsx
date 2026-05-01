@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from './context/AppContext';
 import Login from './components/Login';
 import Sidebar from './components/Sidebar';
@@ -29,6 +29,48 @@ const SOLO_ADMIN = new Set(['cierreCaja', 'gastosCompras', 'rentabilidad', 'conf
 export default function App() {
   const { paginaActiva, notificaciones, empleado, esAdmin, setPaginaActiva } = useApp();
 
+  // Estado del modal de base de caja
+  const [baseVerificada,    setBaseVerificada]    = useState(false);
+  const [mostrarModalBase,  setMostrarModalBase]  = useState(false);
+  const [efectivoBase,      setEfectivoBase]      = useState('');
+  const [nequiBase,         setNequiBase]         = useState('');
+  const [guardandoBase,     setGuardandoBase]     = useState(false);
+
+  const hoy = new Date().toISOString().split('T')[0];
+
+  // Al iniciar sesión como admin, verificar si ya hay base de caja registrada hoy
+  useEffect(() => {
+    if (!empleado || !esAdmin || baseVerificada) return;
+    window.electronAPI.getBaseCaja(hoy).then(base => {
+      if (base) {
+        setBaseVerificada(true);
+      } else {
+        setMostrarModalBase(true);
+      }
+    }).catch(() => setBaseVerificada(true));
+  }, [empleado, esAdmin, hoy, baseVerificada]);
+
+  const confirmarBase = async () => {
+    if (guardandoBase) return;
+    const ef = Math.round(parseFloat(efectivoBase) || 0);
+    const nq = Math.round(parseFloat(nequiBase)    || 0);
+    setGuardandoBase(true);
+    try {
+      await window.electronAPI.registrarBaseCaja({
+        fecha: hoy,
+        empleado,
+        efectivo_base: ef,
+        nequi_base:    nq,
+      });
+      setMostrarModalBase(false);
+      setBaseVerificada(true);
+    } catch (err) {
+      console.error('[BaseCaja] Error al registrar:', err);
+    } finally {
+      setGuardandoBase(false);
+    }
+  };
+
   if (!empleado) return <Login />;
 
   // Si un empleado intenta acceder a una página restringida, redirigir al dashboard
@@ -55,6 +97,93 @@ export default function App() {
             {n.mensaje}
           </div>
         ))}
+      </div>
+
+      {/* Modal obligatorio de base de caja — solo admin, solo si no hay base hoy */}
+      {mostrarModalBase && (
+        <ModalBaseCaja
+          hoy={hoy}
+          efectivoBase={efectivoBase}
+          nequiBase={nequiBase}
+          onEfectivoChange={setEfectivoBase}
+          onNequiChange={setNequiBase}
+          onConfirmar={confirmarBase}
+          guardando={guardandoBase}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Modal de base de caja al inicio del turno ────────────────────────────────
+function ModalBaseCaja({ hoy, efectivoBase, nequiBase, onEfectivoChange, onNequiChange, onConfirmar, guardando }) {
+  const fechaLegible = new Date(hoy + 'T12:00:00').toLocaleDateString('es-CO', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.75)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: 'var(--fondo-card)',
+        border: '2px solid var(--naranja)',
+        borderRadius: 20,
+        padding: 36,
+        width: '100%', maxWidth: 420,
+        boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+      }}>
+        {/* Encabezado */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>💵</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--naranja)' }}>
+            Base de Caja
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--texto-suave)', marginTop: 4, textTransform: 'capitalize' }}>
+            {fechaLegible}
+          </div>
+        </div>
+
+        {/* Campos */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+          <div className="form-grupo">
+            <label className="form-label">💵 Efectivo en caja al inicio ($)</label>
+            <input
+              type="number"
+              min="0"
+              value={efectivoBase}
+              onChange={e => onEfectivoChange(e.target.value)}
+              placeholder="0"
+              autoFocus
+            />
+          </div>
+          <div className="form-grupo">
+            <label className="form-label">📱 Saldo Nequi disponible ($)</label>
+            <input
+              type="number"
+              min="0"
+              value={nequiBase}
+              onChange={e => onNequiChange(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 20, textAlign: 'center' }}>
+          Este registro es obligatorio para el cuadre del día.
+          <br/>Puedes corregirlo desde Configuración → Base de Caja.
+        </div>
+
+        <button
+          className="btn btn-primario btn-grande"
+          style={{ width: '100%' }}
+          onClick={onConfirmar}
+          disabled={guardando}
+        >
+          {guardando ? '⏳ Guardando...' : '✅ Confirmar e iniciar'}
+        </button>
       </div>
     </div>
   );

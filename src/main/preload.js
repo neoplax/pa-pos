@@ -33,6 +33,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cerrarCaja:      (datos)  => ipcRenderer.invoke('db:cerrarCaja', datos),
   getHistorialCaja: ()      => ipcRenderer.invoke('db:getHistorialCaja'),
 
+  // ── Base de caja ───────────────────────────────────────────
+  getBaseCaja:          (fecha)  => ipcRenderer.invoke('db:getBaseCaja', fecha),
+  registrarBaseCaja:    (datos)  => ipcRenderer.invoke('db:registrarBaseCaja', datos),
+  updateBaseCaja:       (datos)  => ipcRenderer.invoke('db:updateBaseCaja', datos),
+  getHistorialBaseCaja: ()       => ipcRenderer.invoke('db:getHistorialBaseCaja'),
+
   // ── Preparaciones batch ────────────────────────────────────
   getPreparaciones: ()      => ipcRenderer.invoke('db:getPreparaciones'),
   crearPreparacion: (datos) => ipcRenderer.invoke('db:crearPreparacion', datos),
@@ -92,6 +98,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   asignarFactura:       (ventaId, facturaNum, efectivoRecibido)     => ipcRenderer.invoke('db:asignarFactura', ventaId, facturaNum, efectivoRecibido),
   getUltimaVenta:       ()                                          => ipcRenderer.invoke('db:getUltimaVenta'),
   getPrinters:          ()                                          => ipcRenderer.invoke('db:getPrinters'),
+
+  // ── Descuentos ─────────────────────────────────────────────────────────────
+  getDescuentos:         ()          => ipcRenderer.invoke('db:getDescuentos'),
+  getDescuentosActivos:  ()          => ipcRenderer.invoke('db:getDescuentosActivos'),
+  agregarDescuento:      (datos)     => ipcRenderer.invoke('db:agregarDescuento', datos),
+  updateDescuento:       (id, datos) => ipcRenderer.invoke('db:updateDescuento', id, datos),
+  toggleDescuento:       (id)        => ipcRenderer.invoke('db:toggleDescuento', id),
+  eliminarDescuento:     (id)        => ipcRenderer.invoke('db:eliminarDescuento', id),
+  getReporteDescuentos:  (filtros)   => ipcRenderer.invoke('db:getReporteDescuentos', filtros),
+
+  // ── Mesas ───────────────────────────────────────────────────────────────────
+  getMesas:                ()          => ipcRenderer.invoke('db:getMesas'),
+  agregarMesa:             (datos)     => ipcRenderer.invoke('db:agregarMesa', datos),
+  updateMesa:              (id, datos) => ipcRenderer.invoke('db:updateMesa', id, datos),
+  toggleMesa:              (id)        => ipcRenderer.invoke('db:toggleMesa', id),
+  guardarPedidoPendiente:  (datos)     => ipcRenderer.invoke('db:guardarPedidoPendiente', datos),
+  getPedidoPendiente:      (mesa_id)   => ipcRenderer.invoke('db:getPedidoPendiente', mesa_id),
+  eliminarPedidoPendiente: (mesa_id)   => ipcRenderer.invoke('db:eliminarPedidoPendiente', mesa_id),
+
+  // ── Domicilios externos ─────────────────────────────────────────────────────
+  getReporteDomiciliosExternos: (filtros) => ipcRenderer.invoke('db:getReporteDomiciliosExternos', filtros),
 
   // ── Sincronización Google Drive ────────────────────────────────────────────
   sync_getEstado:                   ()      => ipcRenderer.invoke('sync:getEstado'),
