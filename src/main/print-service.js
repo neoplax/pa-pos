@@ -396,6 +396,28 @@ async function printWindows(buffer, texto, printerName) {
     _logWin(`Resultado intento 4: ${e4.message}`);
   }
 
+  // ── Intento 5: node-thermal-printer (si está instalado y compilado) ─────────
+  // Usa el driver nativo de Windows vía @thiagoelg/node-printer
+  try {
+    const { printer: ThermalPrinter, types: PrinterTypes } = require('node-thermal-printer');
+    _logWin(`Intento 5 (node-thermal-printer) → interface: printer:${nombre}`);
+    const tp = new ThermalPrinter({
+      type:                    PrinterTypes.EPSON,
+      interface:               `printer:${nombre}`,
+      removeSpecialCharacters: false,
+    });
+    const conectado = await tp.isPrinterConnected();
+    _logWin(`node-thermal-printer conectado: ${conectado}`);
+    if (conectado) {
+      await tp.raw(buffer);
+      await tp.execute();
+      _logWin('Resultado: OK (node_thermal_printer)');
+      return { ok: true, metodo: 'node_thermal_printer' };
+    }
+  } catch (e5) {
+    _logWin(`Resultado intento 5: ${e5.message}`);
+  }
+
   // Todos los intentos fallaron — .txt ya fue guardado como respaldo
   _logWin('Todos los intentos fallaron — respaldo .txt guardado en ~/perros-americanos/recibos/');
   return { ok: true, metodo: 'txt_backup', aviso: 'impresora_no_disponible' };

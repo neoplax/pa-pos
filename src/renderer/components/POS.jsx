@@ -151,17 +151,26 @@ export default function POS() {
   };
 
   // ── Volver al selector de mesas ───────────────────────────────────────────
-  const volverSelectorMesas = async () => {
-    // Guardar carrito sincronamente antes de limpiar estado (evita race condition con debounce)
-    if (mesaActual && mesaActual.id !== 0 && carrito.length > 0) {
-      clearTimeout(refGuardar.current);
-      await window.electronAPI.guardarPedidoPendiente({
-        mesa_id:    mesaActual.id,
-        mesa_nombre: mesaActual.nombre,
-        empleado:   empleado || '',
-        items:      carrito,
-      });
+  // guardarPendiente=true  → preservar carrito en BD (navegación manual "← Volver")
+  // guardarPendiente=false → borrar pedido de BD (después de cobrar exitosamente)
+  const volverSelectorMesas = async (guardarPendiente = true) => {
+    clearTimeout(refGuardar.current);
+
+    if (mesaActual && mesaActual.id !== 0) {
+      if (guardarPendiente && carrito.length > 0) {
+        // Guardar carrito antes de salir (el empleado vuelve más tarde a cobrar)
+        await window.electronAPI.guardarPedidoPendiente({
+          mesa_id:     mesaActual.id,
+          mesa_nombre: mesaActual.nombre,
+          empleado:    empleado || '',
+          items:       carrito,
+        });
+      } else if (!guardarPendiente) {
+        // Cobro completado: limpiar pedido de la mesa en BD
+        await window.electronAPI.eliminarPedidoPendiente(mesaActual.id);
+      }
     }
+
     setMesaActual(null);
     setCarrito([]);
     setDescuentoAplicado(null);
@@ -342,8 +351,8 @@ export default function POS() {
           }
         }
         notificar(`✅ Venta #${result.ventaId} registrada — $${total.toLocaleString('es-CO')}`, 'exito');
-        // Volver al selector de mesas después de cobrar
-        volverSelectorMesas();
+        // Volver al selector: false = no re-guardar carrito, la mesa queda libre
+        await volverSelectorMesas(false);
       }
     } catch (err) {
       notificar('❌ Error al registrar la venta', 'error');

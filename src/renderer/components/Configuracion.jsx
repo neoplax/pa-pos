@@ -1696,7 +1696,14 @@ function TabVersion({
   updateProgress, setUpdateProgress,
   updateError, setUpdateError,
 }) {
-  const pkgVersion = '1.0.0'; // sincronizado con package.json
+  const [pkgVersion, setPkgVersion] = useState('...');
+
+  // Leer la versión real desde el proceso principal (evita el string hardcodeado)
+  useEffect(() => {
+    window.electronAPI.getAppVersion()
+      .then(v => setPkgVersion(v || '?'))
+      .catch(() => setPkgVersion('?'));
+  }, []);
 
   const buscarActualizaciones = async () => {
     setUpdateEstado('checking');

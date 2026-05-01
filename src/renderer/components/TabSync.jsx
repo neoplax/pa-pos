@@ -39,7 +39,7 @@ export default function TabSync() {
     setAutoActivo(syncEstado.syncAutoActivo !== false);
   }, [syncEstado.intervaloMinutos, syncEstado.syncAutoActivo]);
 
-  const { configurado, cuentaEmail, espacioUsado, espacioTotal, ultimaSync, estado, errorMsg } = syncEstado;
+  const { configurado, cuentaEmail, espacioUsado, espacioTotal, ultimaSync, estado, errorMsg, carpetaId } = syncEstado;
 
   // ── Wizard Paso 2: guardar credenciales en disco y avanzar al Paso 3 ────────
   async function guardarYContinuar() {
@@ -232,6 +232,15 @@ export default function TabSync() {
              : estado === 'error'          ? '🔴 Error'
              : estado === 'sincronizando'  ? '🔄 Sincronizando...'
              : '⚪ Sin configurar'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 13 }}>
+            <span style={{ color: 'var(--texto-suave)' }}>Carpeta Drive</span>
+            <span style={{ fontWeight: 600, color: carpetaId ? '#4caf50' : '#ffeb3b', fontFamily: 'monospace' }}>
+              {carpetaId
+                ? `Carpeta lista ✅ ···${carpetaId.slice(-8)}`
+                : 'Carpeta no configurada ⚠️'}
             </span>
           </div>
 

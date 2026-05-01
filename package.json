@@ -1,6 +1,6 @@
 {
   "name": "pa-pos",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "author": {
     "name": "NEO",
     "email": "neoplaxsolucionesinformaticas@gmail.com"
@@ -81,6 +81,7 @@
     "electron-log": "^5.4.3",
     "electron-updater": "^6.8.3",
     "googleapis": "^144.0.0",
+    "node-thermal-printer": "^4.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.10.3"

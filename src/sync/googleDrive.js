@@ -48,6 +48,18 @@ function guardarTokens(datos) {
   fs.writeFileSync(ARCHIVO_TOKENS, JSON.stringify(datos, null, 2), 'utf8');
 }
 
+// ── Guardar carpeta_id en tokens.json sin tocar el resto de campos ────────────
+function guardarCarpetaId(carpetaId) {
+  try {
+    asegurarDirConfig();
+    const tokens = leerTokens() || {};
+    tokens.carpeta_id = carpetaId;
+    fs.writeFileSync(ARCHIVO_TOKENS, JSON.stringify(tokens, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[Drive] Error guardando carpeta_id:', e.message);
+  }
+}
+
 // ── Guardar solo client_id y client_secret (Paso 2 del wizard) ───────────────
 // Elimina tokens.json para que estaConfigurado() devuelva false hasta completar OAuth.
 function guardarCredencialesParciales(clientId, clientSecret) {
@@ -239,21 +251,46 @@ async function iniciarFlujoOAuth(clientId, clientSecret) {
 }
 
 // ── Obtener o crear la carpeta "PerrosAmericanos_POS" en Drive ────────────────
+// Siempre retorna un ID válido — nunca null.
+// Orden: (1) carpeta_id guardado en tokens.json si aún existe en Drive,
+//        (2) buscar en Drive por nombre, (3) crear si no existe.
+// Cada vez que se obtiene o crea el ID, se persiste en tokens.json.
 async function obtenerOCrearCarpeta(drive) {
-  const res = await drive.files.list({
+  // 1. Intentar reutilizar el ID ya persistido
+  const tokens = leerTokens();
+  if (tokens?.carpeta_id) {
+    try {
+      await drive.files.get({ fileId: tokens.carpeta_id, fields: 'id' });
+      return tokens.carpeta_id; // la carpeta sigue existiendo
+    } catch (_) {
+      // El ID guardado ya no es válido (borrada o inaccesible) — buscar de nuevo
+      console.log('[Drive] carpeta_id guardado inválido, buscando en Drive...');
+    }
+  }
+
+  // 2. Buscar la carpeta por nombre en Drive
+  const busqueda = await drive.files.list({
     q:      `name='${NOMBRE_CARPETA}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id, name)',
     spaces: 'drive',
   });
 
-  if (res.data.files?.length > 0) return res.data.files[0].id;
+  if (busqueda.data.files?.length > 0) {
+    const carpetaId = busqueda.data.files[0].id;
+    guardarCarpetaId(carpetaId);
+    console.log(`[Drive] Carpeta "${NOMBRE_CARPETA}" encontrada, id: ${carpetaId}`);
+    return carpetaId;
+  }
 
+  // 3. No existe — crearla
   const nueva = await drive.files.create({
     requestBody: { name: NOMBRE_CARPETA, mimeType: 'application/vnd.google-apps.folder' },
     fields: 'id',
   });
-  console.log(`[Drive] Carpeta "${NOMBRE_CARPETA}" creada, id: ${nueva.data.id}`);
-  return nueva.data.id;
+  const carpetaId = nueva.data.id;
+  guardarCarpetaId(carpetaId);
+  console.log(`[Drive] Carpeta "${NOMBRE_CARPETA}" creada, id: ${carpetaId}`);
+  return carpetaId;
 }
 
 // ── Subir el archivo SQLite a Drive ──────────────────────────────────────────
@@ -262,8 +299,7 @@ async function subirDB(rutaLocalDB) {
   if (!cliente) throw new Error('No hay cuenta de Google configurada');
 
   const drive     = google.drive({ version: 'v3', auth: cliente });
-  const tokens    = leerTokens();
-  const carpetaId = tokens?.carpeta_id || (await obtenerOCrearCarpeta(drive));
+  const carpetaId = await obtenerOCrearCarpeta(drive);
 
   const lista = await drive.files.list({
     q:      `name='${NOMBRE_DB_DRIVE}' and '${carpetaId}' in parents and trashed=false`,
@@ -302,9 +338,7 @@ async function bajarDB(rutaDestino) {
   if (!cliente) throw new Error('No hay cuenta de Google configurada');
 
   const drive     = google.drive({ version: 'v3', auth: cliente });
-  const tokens    = leerTokens();
-  const carpetaId = tokens?.carpeta_id;
-  if (!carpetaId) throw new Error('ID de carpeta no encontrado. Reconecta la cuenta.');
+  const carpetaId = await obtenerOCrearCarpeta(drive);
 
   const lista = await drive.files.list({
     q:      `name='${NOMBRE_DB_DRIVE}' and '${carpetaId}' in parents and trashed=false`,
@@ -312,7 +346,7 @@ async function bajarDB(rutaDestino) {
     spaces: 'drive',
   });
 
-  if (!lista.data.files?.length) throw new Error('No hay base de datos en Drive para descargar');
+  if (!lista.data.files?.length) throw new Error('No hay base de datos en Drive para descargar. Sube primero desde la otra máquina.');
 
   const fileId = lista.data.files[0].id;
 
@@ -341,8 +375,7 @@ async function subirBackup(rutaLocalDB, nombreEnDrive) {
   if (!cliente) return;
 
   const drive     = google.drive({ version: 'v3', auth: cliente });
-  const tokens    = leerTokens();
-  const carpetaId = tokens?.carpeta_id || (await obtenerOCrearCarpeta(drive));
+  const carpetaId = await obtenerOCrearCarpeta(drive);
 
   await drive.files.create({
     requestBody: { name: nombreEnDrive, parents: [carpetaId] },
@@ -358,9 +391,7 @@ async function obtenerMetadatosDB() {
   if (!cliente) return null;
 
   const drive     = google.drive({ version: 'v3', auth: cliente });
-  const tokens    = leerTokens();
-  const carpetaId = tokens?.carpeta_id;
-  if (!carpetaId) return null;
+  const carpetaId = await obtenerOCrearCarpeta(drive);
 
   const lista = await drive.files.list({
     q:      `name='${NOMBRE_DB_DRIVE}' and '${carpetaId}' in parents and trashed=false`,

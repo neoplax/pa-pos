@@ -136,7 +136,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sync_offEstadoCambiado: ()     => ipcRenderer.removeAllListeners('sync:estadoCambiado'),
 
   // ── App ────────────────────────────────────────────────────────────────────
-  reiniciarApp: () => ipcRenderer.invoke('app:reiniciar'),
+  reiniciarApp:  () => ipcRenderer.invoke('app:reiniciar'),
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
 
   // ── Actualizaciones ────────────────────────────────────────────────────────
   update_check:   ()   => ipcRenderer.invoke('update:check'),

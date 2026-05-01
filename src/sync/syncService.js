@@ -60,7 +60,7 @@ function persistirEstado() {
 function notificarRenderer() {
   try {
     if (ventanaPrincipal && !ventanaPrincipal.isDestroyed()) {
-      ventanaPrincipal.webContents.send('sync:estadoCambiado', { ...estado });
+      ventanaPrincipal.webContents.send('sync:estadoCambiado', getEstado());
     }
   } catch (_) {}
 }
@@ -387,8 +387,9 @@ function desconectarCuenta() {
 }
 
 // ── Obtener estado completo (para IPC) ────────────────────────────────────────
+// Incluye carpeta_id leído de tokens.json para que el renderer pueda mostrarlo.
 function getEstado() {
-  return { ...estado };
+  return { ...estado, carpetaId: drive.leerTokens()?.carpeta_id || null };
 }
 
 module.exports = {

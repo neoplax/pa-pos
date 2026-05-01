@@ -18,11 +18,17 @@ let ventanaPrincipal;
 function configurarAutoUpdater() {
   if (isDev) return; // No verificar en desarrollo
 
-  autoUpdater.checkForUpdatesAndNotify();
+  // Repositorio público en GitHub — no requiere token privado
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner:    'neoplax',
+    repo:     'pa-pos',
+  });
 
+  // Registrar eventos ANTES de llamar checkForUpdates para no perder notificaciones
   autoUpdater.on('update-available', (info) => {
     ventanaPrincipal?.webContents.send('update:available', {
-      version: info.version,
+      version:     info.version,
       releaseDate: info.releaseDate,
     });
     log.info('Actualización disponible:', info.version);
@@ -34,9 +40,9 @@ function configurarAutoUpdater() {
 
   autoUpdater.on('download-progress', (progress) => {
     ventanaPrincipal?.webContents.send('update:progress', {
-      percent: Math.round(progress.percent),
+      percent:     Math.round(progress.percent),
       transferred: progress.transferred,
-      total: progress.total,
+      total:       progress.total,
     });
   });
 
@@ -51,6 +57,9 @@ function configurarAutoUpdater() {
     ventanaPrincipal?.webContents.send('update:error', err.message);
     log.error('Error en updater:', err);
   });
+
+  // Verificar solo después de registrar todos los listeners
+  autoUpdater.checkForUpdatesAndNotify();
 }
 
 // Instalar actualización ya descargada

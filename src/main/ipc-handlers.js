@@ -36,6 +36,12 @@ function setupIpcHandlers() {
   patchLimpiezaDatosPrueba(db);
   patchTocinetaV3(db);
 
+  // Limpiar pedidos pendientes vacíos o corruptos al iniciar la app
+  // Evita que mesas queden marcadas como "Abierta" sin tener ítems reales
+  db.prepare(
+    `DELETE FROM pedidos_pendientes WHERE items = '[]' OR items = '' OR items IS NULL`
+  ).run();
+
   // ── PRODUCTOS ─────────────────────────────────────────────────────────────
 
   ipcMain.handle('db:getProductos', () => {
@@ -1212,6 +1218,9 @@ function setupIpcHandlers() {
     app.exit(0);
   });
 
+  // Versión real de la app desde Electron (no el string hardcodeado del renderer)
+  ipcMain.handle('app:getVersion', () => app.getVersion());
+
   // ── DESCUENTOS ────────────────────────────────────────────────────────────────
 
   ipcMain.handle('db:getDescuentos', () => {
@@ -1301,20 +1310,21 @@ function setupIpcHandlers() {
 
   ipcMain.handle('db:getMesas', () => {
     const mesas = db.prepare('SELECT * FROM mesas WHERE activo=1 ORDER BY numero').all();
-    // Anotar estado: tiene pedido pendiente activo
+    // Solo marcar "activo" si la mesa tiene ítems reales (total > 0)
+    // Una fila vacía o con items=[] no cuenta como pedido activo
     const pendientes = db.prepare('SELECT mesa_id, items FROM pedidos_pendientes').all();
     const mapPend = {};
     for (const p of pendientes) {
-      let total = 0;
       try {
         const items = JSON.parse(p.items || '[]');
-        total = items.reduce((s, i) => s + (i.precio || 0) * (i.cantidad || 0), 0);
+        if (items.length === 0) continue; // ignorar filas vacías
+        const total = items.reduce((s, i) => s + (i.precio || 0) * (i.cantidad || 0), 0);
+        if (total > 0) mapPend[p.mesa_id] = total;
       } catch(_) {}
-      mapPend[p.mesa_id] = total;
     }
     return mesas.map(m => ({
       ...m,
-      estado: mapPend[m.id] !== undefined ? 'activo' : 'libre',
+      estado:        mapPend[m.id] !== undefined ? 'activo' : 'libre',
       total_parcial: mapPend[m.id] || 0,
     }));
   });
