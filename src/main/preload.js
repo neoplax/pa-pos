@@ -117,6 +117,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPedidoPendiente:      (mesa_id)   => ipcRenderer.invoke('db:getPedidoPendiente', mesa_id),
   eliminarPedidoPendiente: (mesa_id)   => ipcRenderer.invoke('db:eliminarPedidoPendiente', mesa_id),
 
+  // ── Transferencias internas ─────────────────────────────────────────────────
+  getTransferenciasInternas: (filtros) => ipcRenderer.invoke('db:getTransferenciasInternas', filtros),
+
   // ── Domicilios externos ─────────────────────────────────────────────────────
   getReporteDomiciliosExternos: (filtros) => ipcRenderer.invoke('db:getReporteDomiciliosExternos', filtros),
 

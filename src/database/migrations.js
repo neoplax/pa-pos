@@ -395,6 +395,22 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_base_caja_fecha ON base_caja(fecha);
   `);
 
+  // ── TRANSFERENCIAS INTERNAS: cambios efectivo↔Nequi (no afectan totales) ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS transferencias_internas (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha     TEXT    NOT NULL,
+      concepto  TEXT    NOT NULL DEFAULT '',
+      valor     INTEGER NOT NULL DEFAULT 0,
+      de_medio  TEXT    NOT NULL DEFAULT 'efectivo',
+      a_medio   TEXT    NOT NULL DEFAULT 'nequi',
+      empleado  TEXT    NOT NULL DEFAULT '',
+      notas     TEXT    NOT NULL DEFAULT '',
+      creado_en TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_transferencias_fecha ON transferencias_internas(fecha);
+  `);
+
   console.log('[DB] Migraciones completadas.');
 }
 

@@ -50,7 +50,7 @@ export default function GastosCompras() {
   const [gastos, setGastos]             = useState([]);
   const [cargando, setCargando]         = useState(false);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   const primerDiaMes = hoy.slice(0, 8) + '01';
 
   const cargar = useCallback(async () => {
@@ -136,7 +136,7 @@ export default function GastosCompras() {
 
 function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notificar, onGuardado }) {
   const [categoria, setCategoria]           = useState('otro');
-  const [fecha, setFecha]                   = useState(new Date().toISOString().split('T')[0]);
+  const [fecha, setFecha]                   = useState(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0]);
   const [descripcion, setDescripcion]       = useState('');
   const [monto, setMonto]                   = useState('');
   const [metodo, setMetodo]                 = useState('efectivo');
@@ -291,7 +291,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
             </div>
             <div className="form-grupo" style={{ marginBottom: 0 }}>
               <label className="form-label">Categoría</label>
-              <select value={categoria} onChange={e => { setCategoria(e.target.value); limpiar(); setFecha(new Date().toISOString().split('T')[0]); }}>
+              <select value={categoria} onChange={e => { setCategoria(e.target.value); limpiar(); setFecha(new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0]); }}>
                 {CATEGORIAS_GASTO.map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
@@ -874,10 +874,10 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
   const [diasRango, setDiasRango]             = useState(30);
   const [modalEdit, setModalEdit]             = useState(null);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   const fechaInicio = (() => {
     const d = new Date(); d.setDate(d.getDate() - diasRango);
-    return d.toISOString().split('T')[0];
+    return new Date(d - d.getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   })();
 
   const filtrados = gastos.filter(g => {

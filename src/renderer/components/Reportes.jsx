@@ -20,13 +20,14 @@ export default function Reportes() {
   const [saldo, setSaldo]                   = useState(null);
   const [empleados, setEmpleados]           = useState([]);
   const [reporteDescuentos, setReporteDescuentos] = useState(null);
+  const [transferencias, setTransferencias] = useState([]);
   const [cargando, setCargando]             = useState(false);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   const fechaInicio = (() => {
     const d = new Date();
     d.setDate(d.getDate() - diasRango);
-    return d.toISOString().split('T')[0];
+    return new Date(d - d.getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   })();
 
   const cargar = useCallback(async () => {
@@ -42,10 +43,11 @@ export default function Reportes() {
         window.electronAPI.getBajas({ fechaInicio, fechaFin: hoy }),
         window.electronAPI.getEmpleados(),
         window.electronAPI.getReporteDescuentos({ fechaInicio, fechaFin: hoy }),
+        window.electronAPI.getTransferenciasInternas({ fechaInicio, fechaFin: hoy }),
       ];
       if (esAdmin) promesas.push(window.electronAPI.getSaldoDisponible());
 
-      const [dias, prods, comprasData, gastosData, provs, doms, bajasData, emps, descData, saldoData] =
+      const [dias, prods, comprasData, gastosData, provs, doms, bajasData, emps, descData, transData, saldoData] =
         await Promise.all(promesas);
 
       setVentasDia(dias);
@@ -57,6 +59,7 @@ export default function Reportes() {
       setBajas(bajasData || []);
       setEmpleados(emps || []);
       setReporteDescuentos(descData || null);
+      setTransferencias(transData || []);
       if (esAdmin && saldoData) setSaldo(saldoData);
     } catch (err) {
       console.error('[Reportes] Error:', err);
@@ -199,7 +202,8 @@ export default function Reportes() {
         <FlujoCaja ventasDia={ventasDia} gastosPeriodo={gastosPeriodo} formatFecha={formatFecha}
           totalPeriodo={totalPeriodo} totalEgresos={totalEgresos} />
       ) : vista === 'gastos' ? (
-        <GastosPeriodo compras={compras} gastos={gastosPeriodo} formatFecha={formatFecha} />
+        <GastosPeriodo compras={compras} gastos={gastosPeriodo} formatFecha={formatFecha}
+          transferencias={transferencias} />
       ) : vista === 'domicilios' ? (
         <ReporteDomicilios data={domicilios} fechaInicio={fechaInicio} fechaFin={hoy} />
       ) : vista === 'descuentos' ? (
@@ -311,7 +315,7 @@ function FlujoCaja({ ventasDia, gastosPeriodo, formatFecha, totalPeriodo, totalE
 
 // ── Gastos del Período ────────────────────────────────────────────────────────
 
-function GastosPeriodo({ compras, gastos, formatFecha }) {
+function GastosPeriodo({ compras, gastos, formatFecha, transferencias = [] }) {
   // Combina compras + gastos para el período
   const totalCompras = compras.reduce((s, c) => s + c.precio_pagado, 0);
   const totalGastos  = gastos.filter(g => g.tipo_registro === 'gasto').reduce((s, g) => s + g.monto, 0);
@@ -420,6 +424,37 @@ function GastosPeriodo({ compras, gastos, formatFecha }) {
           </table>
         </div>
       </div>
+
+      {transferencias.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-titulo" style={{ color: 'var(--texto-suave)' }}>
+            Transferencias internas — no afectan totales
+          </div>
+          <div className="tabla-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Concepto</th><th>De</th><th>A</th>
+                  <th style={{ textAlign: 'right' }}>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transferencias.map(t => (
+                  <tr key={t.id} style={{ opacity: 0.7 }}>
+                    <td className="texto-suave">{(t.fecha || '').split(' ')[0]}</td>
+                    <td>{t.concepto}</td>
+                    <td><span className="badge badge-azul" style={{ fontSize: 10 }}>{t.de_medio}</span></td>
+                    <td><span className="badge badge-verde" style={{ fontSize: 10 }}>{t.a_medio}</span></td>
+                    <td style={{ textAlign: 'right' }} className="texto-suave negrita">
+                      ${(t.valor || 0).toLocaleString('es-CO')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

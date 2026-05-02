@@ -55,7 +55,7 @@ export default function Dashboard() {
   const [updateReady, setUpdateReady] = useState(null);  // { version }
   const [updateError, setUpdateError] = useState(null);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
 
   const cargar = useCallback(async () => {
     try {

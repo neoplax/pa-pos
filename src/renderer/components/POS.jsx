@@ -4,10 +4,10 @@ import { useApp } from '../context/AppContext';
 const GASEOSAS_COMBO = ['Colombianita', 'Pepsi chiquita', 'Manzana Zero', 'Coca-Cola 250ml'];
 
 const CATEGORIAS = [
-  { id: 'principal', label: '🌭 Principales' },
-  { id: 'combo',     label: '🎉 Combos'      },
-  { id: 'adicion',   label: '➕ Adiciones'  },
-  { id: 'bebida',    label: '🥤 Bebidas'     },
+  { id: 'principal', label: 'Principales' },
+  { id: 'combo',     label: 'Combos'      },
+  { id: 'adicion',   label: 'Adiciones'   },
+  { id: 'bebida',    label: 'Bebidas'     },
 ];
 
 // Plataformas de domicilio externo con su comisión por defecto
@@ -139,7 +139,7 @@ export default function POS() {
       const pendiente = await window.electronAPI.getPedidoPendiente(mesa.id);
       if (pendiente && pendiente.items && pendiente.items.length > 0) {
         setCarrito(pendiente.items);
-        notificar(`📋 Retomando pedido de ${mesa.nombre} — ${pendiente.items.length} ítems`, 'info');
+        notificar(`Retomando pedido de ${mesa.nombre} — ${pendiente.items.length} ítems`, 'info');
       } else {
         setCarrito([]);
       }
@@ -382,7 +382,7 @@ export default function POS() {
           <div className="empleado-opciones">
             {['Juan', 'Sofía'].map(nombre => (
               <button key={nombre} className="empleado-btn" onClick={() => setEmpleado(nombre)}>
-                <span className="emp-avatar">{nombre === 'Juan' ? '👨‍🍳' : '👩‍🍳'}</span>
+                <span className="emp-avatar">{nombre.charAt(0)}</span>
                 {nombre}
               </button>
             ))}
@@ -429,10 +429,10 @@ export default function POS() {
       {/* ── Panel izquierdo: productos ── */}
       <div className="pos-productos-panel">
         <div className="flex items-center justify-between">
-          <div className="pagina-titulo" style={{ marginBottom: 0 }}>🛒 Punto de Venta</div>
+          <div className="pagina-titulo" style={{ marginBottom: 0 }}>Punto de Venta</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span className="badge badge-naranja">
-              {mesaActual.id === 0 ? '🛵 Para llevar' : `🪑 ${mesaActual.nombre}`}
+              {mesaActual.id === 0 ? 'Para llevar' : mesaActual.nombre}
             </span>
             <span className="badge badge-azul">Turno: {empleado}</span>
             <button
@@ -488,7 +488,7 @@ export default function POS() {
       {/* ── Panel derecho: carrito ── */}
       <div className="pos-carrito">
         <div className="carrito-header">
-          <span>🧾 Pedido{mesaActual.id !== 0 ? ` — ${mesaActual.nombre}` : ' — Para llevar'}</span>
+          <span>Pedido{mesaActual.id !== 0 ? ` — ${mesaActual.nombre}` : ' — Para llevar'}</span>
           {carrito.length > 0 && (
             <button
               style={{ background: 'none', border: 'none', color: 'var(--rojo)',
@@ -547,7 +547,7 @@ export default function POS() {
               }}
               onClick={abrirModalDescuentos}
             >
-              🏷️ Aplicar descuento
+              Aplicar descuento
             </button>
           )}
 
@@ -560,7 +560,7 @@ export default function POS() {
               borderRadius: 8,
             }}>
               <span style={{ fontSize: 13, color: 'var(--verde)', fontWeight: 600 }}>
-                🏷️ {descuentoAplicado.nombre}
+                {descuentoAplicado.nombre}
                 {descuentoAplicado.tipo === 'porcentaje' && ` (${descuentoAplicado.valor}%)`}
                 {descuentoAplicado.tipo === 'fijo' && ` (-$${descuentoAplicado.valor.toLocaleString('es-CO')})`}
               </span>
@@ -579,9 +579,9 @@ export default function POS() {
             <div className="form-label" style={{ marginBottom: 8 }}>Método de pago</div>
             <div className="pago-selector">
               {[
-                { id: 'efectivo', label: '💵 Efectivo' },
-                { id: 'nequi',    label: '📱 Nequi'    },
-                { id: 'mixto',    label: '🔀 Mixto'    },
+                { id: 'efectivo', label: 'Efectivo' },
+                { id: 'nequi',    label: 'Nequi'    },
+                { id: 'mixto',    label: 'Mixto'    },
               ].map(mp => (
                 <button
                   key={mp.id}
@@ -596,7 +596,7 @@ export default function POS() {
             {/* Efectivo recibido + cambio */}
             {metodoPago === 'efectivo' && (
               <div style={{ marginTop: 8 }}>
-                <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>💵 Efectivo recibido</div>
+                <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>Efectivo recibido</div>
                 <input
                   type="number" min="0" value={efectivoRecibido}
                   onChange={e => setEfectivoRecibido(e.target.value)}
@@ -621,12 +621,12 @@ export default function POS() {
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <div style={{ flex: 1 }}>
-                    <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>💵 Efectivo</div>
+                    <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>Efectivo</div>
                     <input type="number" min="0" value={efectivoMixto}
                       onChange={e => setEfectivoMixto(e.target.value)} placeholder="0" style={{ width: '100%' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>📱 Nequi</div>
+                    <div className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>Nequi</div>
                     <input type="number" min="0" value={nequiMixto}
                       onChange={e => setNequiMixto(e.target.value)} placeholder="0" style={{ width: '100%' }} />
                   </div>
@@ -634,7 +634,7 @@ export default function POS() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: mixtoValido ? 'var(--verde)' : 'var(--rojo)' }}>
                   {mixtoValido
                     ? `✅ Suma correcta: $${total.toLocaleString('es-CO')}`
-                    : `⚠️ Suma: $${(efectivoMixtoN + nequiMixtoN).toLocaleString('es-CO')} — debe ser $${total.toLocaleString('es-CO')}`}
+                    : `⚠️ Suma: $${(efectivoMixtoN + nequiMixtoN).toLocaleString('es-CO')} — debe ser $${total.toLocaleString('es-CO')}` }
                 </div>
               </div>
             )}
@@ -654,7 +654,7 @@ export default function POS() {
                     setComisionPct('');
                   }
                 }} />
-              🛵 Es domicilio
+              Es domicilio
             </label>
 
             {esDomicilio && (
@@ -672,14 +672,14 @@ export default function POS() {
                     style={{ flex: 1, fontSize: 12 }}
                     onClick={() => { setEsDomicilioExterno(false); setPlataforma(''); setNumeroOrden(''); setComisionPct(''); }}
                   >
-                    🛵 Propio
+                    Propio
                   </button>
                   <button
                     className={`pago-opcion ${esDomicilioExterno ? 'activo' : ''}`}
                     style={{ flex: 1, fontSize: 12 }}
                     onClick={() => setEsDomicilioExterno(true)}
                   >
-                    📱 Plataforma
+                    Plataforma
                   </button>
                 </div>
 
@@ -746,7 +746,7 @@ export default function POS() {
             )}
             {esDomicilio && valorDomicilioN > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--texto-suave)', marginBottom: 2 }}>
-                <span>🛵 Domicilio</span>
+                <span>Domicilio</span>
                 <span>+${valorDomicilioN.toLocaleString('es-CO')}</span>
               </div>
             )}
@@ -776,7 +776,7 @@ export default function POS() {
             }}
             onClick={reimprimirUltimo}
           >
-            🔁 Reimprimir último recibo
+            Reimprimir último recibo
           </button>
 
           {/* Botones cobrar */}
@@ -792,7 +792,7 @@ export default function POS() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div className="alerta azul" style={{ marginBottom: 0, fontSize: 12 }}>
-                {mesaActual.id !== 0 ? `🪑 ${mesaActual.nombre} · ` : '🛵 Para llevar · '}
+                {mesaActual.id !== 0 ? `${mesaActual.nombre} · ` : 'Para llevar · '}
                 {esDomicilio ? `Domicilio · ` : ''}
                 ${total.toLocaleString('es-CO')} en {metodoPago === 'mixto'
                   ? `mixto (💵${efectivoMixtoN.toLocaleString('es-CO')}+📱${nequiMixtoN.toLocaleString('es-CO')})`
@@ -813,7 +813,7 @@ export default function POS() {
                   disabled={procesando || !mixtoValido}
                   onClick={() => confirmarVenta(false)}
                 >
-                  {procesando ? '⏳...' : '✅ Cobrar sin imprimir'}
+                  {procesando ? 'Procesando...' : '✅ Cobrar sin imprimir'}
                 </button>
                 <button
                   className="btn"
@@ -821,7 +821,7 @@ export default function POS() {
                   disabled={procesando || !mixtoValido}
                   onClick={() => confirmarVenta(true)}
                 >
-                  {procesando ? '⏳...' : '🖨️ Cobrar e Imprimir'}
+                  {procesando ? 'Procesando...' : 'Cobrar e Imprimir'}
                 </button>
               </div>
             </div>

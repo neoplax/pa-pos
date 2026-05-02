@@ -9,6 +9,7 @@ const {
   patchEmpleados, patchCorrecciones, patchProductosEmpaque,
   patchCostosIngredientes, patchRecetasV2, patchDatosHistoricos,
   patchRolesEmpleados, patchUnidadesV2, patchLimpiezaDatosPrueba, patchTocinetaV3,
+  patchDatosHistoricosV2,
 } = require('../database/seed');
 const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters } = require('./print-service');
 const syncService = require('../sync/syncService');
@@ -35,6 +36,7 @@ function setupIpcHandlers() {
   patchUnidadesV2(db);
   patchLimpiezaDatosPrueba(db);
   patchTocinetaV3(db);
+  patchDatosHistoricosV2(db);
 
   // Limpiar pedidos pendientes vacíos o corruptos al iniciar la app
   // Evita que mesas queden marcadas como "Abierta" sin tener ítems reales
@@ -951,6 +953,19 @@ function setupIpcHandlers() {
     }
     // Ordenar: primero mayor utilidad total, luego margen negativo al final
     return result.sort((a, b) => b.utilidad_total - a.utilidad_total);
+  });
+
+  // ── TRANSFERENCIAS INTERNAS ───────────────────────────────────────────────
+
+  ipcMain.handle('db:getTransferenciasInternas', (_, { fechaInicio, fechaFin } = {}) => {
+    let q = 'SELECT * FROM transferencias_internas';
+    const params = [];
+    if (fechaInicio && fechaFin) {
+      q += ' WHERE fecha BETWEEN ? AND ?';
+      params.push(`${fechaInicio} 00:00:00`, `${fechaFin} 23:59:59`);
+    }
+    q += ' ORDER BY fecha DESC';
+    return db.prepare(q).all(...params);
   });
 
   // ── SALDO DISPONIBLE (Part 5) ──────────────────────────────────────────────

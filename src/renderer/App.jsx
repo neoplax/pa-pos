@@ -36,7 +36,7 @@ export default function App() {
   const [nequiBase,         setNequiBase]         = useState('');
   const [guardandoBase,     setGuardandoBase]     = useState(false);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
 
   // Al iniciar sesión como admin, verificar si ya hay base de caja registrada hoy
   useEffect(() => {

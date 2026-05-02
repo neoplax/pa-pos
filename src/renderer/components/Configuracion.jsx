@@ -19,10 +19,10 @@ const CATEGORIAS_ING = [
 ];
 
 const CATEGORIAS_ING_LABEL = {
-  carne: '🥩 Carnes', pan: '🍞 Panes', lacteo: '🧀 Lácteos',
-  vegetal: '🥦 Vegetales', bebida: '🥤 Bebidas', salsa: '🫙 Salsas',
-  topping: '🌽 Toppings', desechable: '🛍️ Desechables',
-  preparado: '⏱️ Preparados', otro: '📦 Otros',
+  carne: 'Carnes', pan: 'Panes', lacteo: 'Lácteos',
+  vegetal: 'Vegetales', bebida: 'Bebidas', salsa: 'Salsas',
+  topping: 'Toppings', desechable: 'Desechables',
+  preparado: 'Preparados', otro: 'Otros',
 };
 
 function normalizar(str) {
@@ -145,7 +145,7 @@ export default function Configuracion() {
 
   const eliminarProveedor = async (id) => {
     await window.electronAPI.eliminarProveedor(id);
-    notificar('🗑️ Proveedor eliminado', 'exito');
+    notificar('Proveedor eliminado', 'exito');
     setConfirmElim(null);
     cargar();
   };
@@ -195,7 +195,7 @@ export default function Configuracion() {
   const eliminarDescuento = async (id) => {
     if (!window.confirm('¿Eliminar este descuento permanentemente?')) return;
     await window.electronAPI.eliminarDescuento(id);
-    notificar('🗑️ Descuento eliminado', 'exito');
+    notificar('Descuento eliminado', 'exito');
     cargar();
   };
 
@@ -218,25 +218,25 @@ export default function Configuracion() {
     cargar();
   };
 
-  if (cargando) return <div className="cargando">⏳ Cargando configuración...</div>;
+  if (cargando) return <div className="cargando">Cargando configuración...</div>;
 
   return (
     <div>
-      <div className="pagina-titulo">⚙️ Configuración</div>
+      <div className="pagina-titulo">Configuración</div>
 
       {/* Tabs */}
       <div className="pos-tabs mb-24">
         {[
-          { id: 'productos',    label: '🍽️ Menú'           },
-          { id: 'inventario',   label: '📦 Inventario'     },
-          { id: 'empleados',    label: '👥 Empleados'      },
-          { id: 'proveedores',  label: '🚚 Proveedores'    },
-          { id: 'descuentos',   label: '🏷️ Descuentos'    },
-          { id: 'mesas',        label: '🪑 Mesas'          },
-          { id: 'base_caja',    label: '💵 Base de Caja'   },
-          { id: 'impresora',    label: '🖨️ Impresora'     },
-          { id: 'sync',         label: '☁️ Sincronización' },
-          { id: 'version',      label: '🔄 Versión'        },
+          { id: 'productos',    label: 'Menú'           },
+          { id: 'inventario',   label: 'Inventario'     },
+          { id: 'empleados',    label: 'Empleados'      },
+          { id: 'proveedores',  label: 'Proveedores'    },
+          { id: 'descuentos',   label: 'Descuentos'     },
+          { id: 'mesas',        label: 'Mesas'          },
+          { id: 'base_caja',    label: 'Base de Caja'   },
+          { id: 'impresora',    label: 'Impresora'      },
+          { id: 'sync',         label: 'Sincronización' },
+          { id: 'version',      label: 'Versión'        },
         ].map(t => (
           <button key={t.id} className={`pos-tab ${tab === t.id ? 'activo' : ''}`}
             onClick={() => setTab(t.id)}>
@@ -253,7 +253,7 @@ export default function Configuracion() {
               {productos.length} productos registrados
             </div>
             <button className="btn btn-primario" onClick={() => setModalNuevoProd(true)}>
-              ➕ Nuevo producto
+              Nuevo producto
             </button>
           </div>
 
@@ -302,14 +302,14 @@ export default function Configuracion() {
                           style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => setModalProd({ ...prod })}
                         >
-                          ✏️ Editar
+                          Editar
                         </button>
                         <button
                           className={`btn ${prod.activo ? 'btn-peligro' : 'btn-exito'}`}
                           style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => toggleProducto(prod.id)}
                         >
-                          {prod.activo ? '🚫 Ocultar' : '✅ Activar'}
+                          {prod.activo ? 'Ocultar' : '✅ Activar'}
                         </button>
                       </div>
                     </td>
@@ -331,7 +331,7 @@ export default function Configuracion() {
             </div>
             <button className="btn btn-primario" style={{ marginLeft: 16, flexShrink: 0 }}
               onClick={() => setModalNuevoIng(true)}>
-              ➕ Agregar ingrediente
+              Agregar ingrediente
             </button>
           </div>
           <div className="tabla-wrapper">
@@ -376,7 +376,7 @@ export default function Configuracion() {
                         style={{ padding: '6px 12px', fontSize: 13 }}
                         onClick={() => setModalIng({ ...ing })}
                       >
-                        ✏️ Editar
+                        Editar
                       </button>
                     </td>
                   </tr>
@@ -523,7 +523,7 @@ export default function Configuracion() {
       {confirmElim !== null && (
         <div className="modal-overlay">
           <div className="modal">
-            <div className="modal-titulo">🗑️ Eliminar proveedor</div>
+            <div className="modal-titulo">Eliminar proveedor</div>
             <p style={{ marginBottom: 24 }}>¿Estás seguro de que deseas eliminar este proveedor?</p>
             <div className="modal-acciones">
               <button className="btn btn-secundario" onClick={() => setConfirmElim(null)}>
@@ -561,7 +561,7 @@ function TabEmpleados({ empleados, onNuevo, onEditar, onToggle }) {
           {activos} activos · {inactivos} inactivos
         </div>
         <button className="btn btn-primario" onClick={onNuevo}>
-          ➕ Agregar empleado
+          Agregar empleado
         </button>
       </div>
 
@@ -570,8 +570,8 @@ function TabEmpleados({ empleados, onNuevo, onEditar, onToggle }) {
           <div key={emp.id} className="card" style={{ padding: '16px 20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <div style={{ fontSize: 36 }}>
-                  {emp.rol === 'administrador' ? '👨‍💼' : '👤'}
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--texto-suave)', minWidth: 36, textAlign: 'center' }}>
+                  {emp.nombre.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -587,9 +587,9 @@ function TabEmpleados({ empleados, onNuevo, onEditar, onToggle }) {
                   </div>
                   {(emp.fecha_ingreso || emp.notas) && (
                     <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 4 }}>
-                      {emp.fecha_ingreso && <span>📅 Ingreso: {emp.fecha_ingreso}</span>}
+                      {emp.fecha_ingreso && <span>Ingreso: {emp.fecha_ingreso}</span>}
                       {emp.fecha_ingreso && emp.notas && <span> · </span>}
-                      {emp.notas && <span>📝 {emp.notas}</span>}
+                      {emp.notas && <span>{emp.notas}</span>}
                     </div>
                   )}
                 </div>
@@ -598,14 +598,14 @@ function TabEmpleados({ empleados, onNuevo, onEditar, onToggle }) {
                 <button className="btn btn-secundario"
                   style={{ padding: '6px 14px', fontSize: 13 }}
                   onClick={() => onEditar(emp)}>
-                  ✏️ Editar
+                  Editar
                 </button>
                 <button
                   className={`btn ${emp.activo ? 'btn-peligro' : 'btn-exito'}`}
                   style={{ padding: '6px 14px', fontSize: 13 }}
                   onClick={() => onToggle(emp.id)}
                 >
-                  {emp.activo ? '🚫 Desactivar' : '✅ Activar'}
+                  {emp.activo ? 'Desactivar' : '✅ Activar'}
                 </button>
               </div>
             </div>
@@ -659,7 +659,7 @@ function ModalEmpleado({ empleado, onCerrar, onGuardar }) {
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 480 }}>
         <div className="modal-titulo">
-          {esNuevo ? '➕ Nuevo empleado' : `✏️ Editar — ${empleado.nombre}`}
+          {esNuevo ? 'Nuevo empleado' : `Editar — ${empleado.nombre}`}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-grupo">
@@ -784,13 +784,13 @@ function ModalEditarProducto({ producto, ingredientes, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 580 }}>
-        <div className="modal-titulo">✏️ Editar — {producto.nombre}</div>
+        <div className="modal-titulo">Editar — {producto.nombre}</div>
 
         <div className="pos-tabs" style={{ marginBottom: 16 }}>
           <button className={`pos-tab ${tabLocal === 'datos' ? 'activo' : ''}`}
             onClick={() => setTabLocal('datos')}>Datos</button>
           <button className={`pos-tab ${tabLocal === 'receta' ? 'activo' : ''}`}
-            onClick={() => setTabLocal('receta')}>🧾 Receta</button>
+            onClick={() => setTabLocal('receta')}>Receta</button>
         </div>
 
         {tabLocal === 'datos' && (
@@ -835,7 +835,7 @@ function ModalEditarProducto({ producto, ingredientes, onCerrar, onGuardar }) {
         {tabLocal === 'receta' && (
           <div>
             {cargandoReceta ? (
-              <div className="cargando">⏳ Cargando receta...</div>
+              <div className="cargando">Cargando receta...</div>
             ) : (
               <>
                 {receta.length > 0 && (
@@ -940,7 +940,7 @@ function ModalNuevoProducto({ onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">➕ Nuevo Producto</div>
+        <div className="modal-titulo">Nuevo Producto</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 12 }}>
             <div className="form-grupo" style={{ flex: 1 }}>
@@ -1005,7 +1005,7 @@ function ModalEditarIngrediente({ ingrediente, proveedores, onCerrar, onGuardar 
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 500 }}>
-        <div className="modal-titulo">✏️ Editar — {ingrediente.nombre}</div>
+        <div className="modal-titulo">Editar — {ingrediente.nombre}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-grupo">
             <label className="form-label">Nombre</label>
@@ -1119,7 +1119,7 @@ function ModalNuevoIngrediente({ proveedores, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="modal-titulo">➕ Nuevo Ingrediente</div>
+        <div className="modal-titulo">Nuevo Ingrediente</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-grupo">
             <label className="form-label">Nombre *</label>
@@ -1262,7 +1262,7 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
           notificar('⚠️ Impresora no disponible — recibo guardado como .txt', 'info');
         } else {
           const metodo = result.metodo ? ` (${result.metodo})` : '';
-          notificar(`🖨️ Recibo de prueba enviado${metodo}`, 'exito');
+          notificar(`Recibo de prueba enviado${metodo}`, 'exito');
         }
       } else {
         notificar('❌ Error: ' + (result?.error || 'desconocido'), 'error');
@@ -1277,7 +1277,7 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
   return (
     <div style={{ maxWidth: 560 }}>
       <div className="card">
-        <div className="card-titulo">🖨️ Configuración de impresión de recibos</div>
+        <div className="card-titulo">Configuración de impresión de recibos</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
           {esWindows ? (
@@ -1334,7 +1334,7 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
                 style={{ fontSize: 13, padding: '0 12px', flexShrink: 0 }}
                 onClick={() => window.electronAPI.getPrinters().then(lista => setImpresoras(lista || []))}
               >
-                🔄
+                ↺
               </button>
             </div>
             {impresora && (
@@ -1368,17 +1368,17 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-primario" onClick={guardar} disabled={guardando}>
-              {guardando ? '⏳ Guardando...' : '💾 Guardar configuración'}
+              {guardando ? 'Guardando...' : 'Guardar configuración'}
             </button>
             <button className="btn btn-secundario" onClick={testPrint} disabled={imprimiendo}>
-              {imprimiendo ? '⏳ Imprimiendo...' : '🖨️ Recibo de prueba'}
+              {imprimiendo ? 'Imprimiendo...' : 'Recibo de prueba'}
             </button>
           </div>
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-titulo">📄 Vista previa del recibo (48 chars × 80mm)</div>
+        <div className="card-titulo">Vista previa del recibo (48 chars × 80mm)</div>
         <pre style={{
           fontFamily: 'monospace', fontSize: 11,
           background: 'var(--fondo)', padding: 12, borderRadius: 6,
@@ -1438,7 +1438,7 @@ function TabProveedores({ proveedores, ingredientes, onNuevo, onEditar, onElimin
           {proveedores.length} proveedores registrados
         </div>
         <button className="btn btn-primario" onClick={onNuevo}>
-          ➕ Nuevo proveedor
+          Nuevo proveedor
         </button>
       </div>
 
@@ -1452,7 +1452,7 @@ function TabProveedores({ proveedores, ingredientes, onNuevo, onEditar, onElimin
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 16 }}>🚚 {prov.nombre}</span>
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>{prov.nombre}</span>
                     {prov.contacto_nombre && (
                       <span className="texto-suave" style={{ fontSize: 13 }}>
                         · {prov.contacto_nombre}
@@ -1460,11 +1460,11 @@ function TabProveedores({ proveedores, ingredientes, onNuevo, onEditar, onElimin
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, marginBottom: 8 }}>
-                    <span>📞 {prov.telefono}</span>
-                    {prov.horario_entrega && <span>🕐 {prov.horario_entrega}</span>}
-                    {prov.dias_pedido && <span>📅 {prov.dias_pedido}</span>}
-                    {prov.forma_pago && <span>💳 {prov.forma_pago}</span>}
-                    {prov.tiempo_entrega && <span>⏱️ {prov.tiempo_entrega}</span>}
+                    <span>{prov.telefono}</span>
+                    {prov.horario_entrega && <span>{prov.horario_entrega}</span>}
+                    {prov.dias_pedido && <span>{prov.dias_pedido}</span>}
+                    {prov.forma_pago && <span>{prov.forma_pago}</span>}
+                    {prov.tiempo_entrega && <span>{prov.tiempo_entrega}</span>}
                   </div>
                   {ingNames.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
@@ -1475,7 +1475,7 @@ function TabProveedores({ proveedores, ingredientes, onNuevo, onEditar, onElimin
                   )}
                   {prov.notas && (
                     <div style={{ fontSize: 12, color: 'var(--naranja)', fontStyle: 'italic' }}>
-                      📝 {prov.notas}
+                      {prov.notas}
                     </div>
                   )}
                 </div>
@@ -1483,17 +1483,17 @@ function TabProveedores({ proveedores, ingredientes, onNuevo, onEditar, onElimin
                   <a href={waLink} target="_blank" rel="noreferrer"
                     className="btn btn-exito"
                     style={{ padding: '6px 12px', fontSize: 13, textDecoration: 'none' }}>
-                    📲 WhatsApp
+                    WhatsApp
                   </a>
                   <button className="btn btn-secundario"
                     style={{ padding: '6px 12px', fontSize: 13 }}
                     onClick={() => onEditar(prov)}>
-                    ✏️ Editar
+                    Editar
                   </button>
                   <button className="btn btn-peligro"
                     style={{ padding: '6px 10px', fontSize: 13 }}
                     onClick={() => onEliminar(prov.id)}>
-                    🗑️
+                    ×
                   </button>
                 </div>
               </div>
@@ -1554,7 +1554,7 @@ function ModalProveedor({ proveedor, ingredientes, onCerrar, onGuardar }) {
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="modal-titulo">
-          {esNuevo ? '➕ Nuevo proveedor' : `✏️ Editar — ${proveedor.nombre}`}
+          {esNuevo ? 'Nuevo proveedor' : `Editar — ${proveedor.nombre}`}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1842,7 +1842,7 @@ function TabDescuentos({ descuentos, onNuevo, onEditar, onToggle, onEliminar }) 
           </div>
         </div>
         <button className="btn btn-primario" onClick={onNuevo}>
-          ➕ Nuevo descuento
+          Nuevo descuento
         </button>
       </div>
 
@@ -1881,7 +1881,7 @@ function TabDescuentos({ descuentos, onNuevo, onEditar, onToggle, onEliminar }) 
                     <td className="texto-naranja negrita">
                       {d.tipo === 'porcentaje' && `${d.valor}%`}
                       {d.tipo === 'fijo'       && `$${(d.valor || 0).toLocaleString('es-CO')}`}
-                      {d.tipo === 'gratis'     && '🎁 Gratis'}
+                      {d.tipo === 'gratis'     && 'Gratis'}
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--texto-suave)' }}>
                       {diasLabel && <div>{diasLabel}</div>}
@@ -1901,18 +1901,18 @@ function TabDescuentos({ descuentos, onNuevo, onEditar, onToggle, onEliminar }) 
                       <div className="flex gap-8">
                         <button className="btn btn-secundario" style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => onEditar(d)}>
-                          ✏️ Editar
+                          Editar
                         </button>
                         <button
                           className={`btn ${d.activo ? 'btn-peligro' : 'btn-exito'}`}
                           style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => onToggle(d.id)}
                         >
-                          {d.activo ? '🚫 Desactivar' : '✅ Activar'}
+                          {d.activo ? 'Desactivar' : '✅ Activar'}
                         </button>
                         <button className="btn btn-peligro" style={{ padding: '6px 10px', fontSize: 13 }}
                           onClick={() => onEliminar(d.id)}>
-                          🗑
+                          ×
                         </button>
                       </div>
                     </td>
@@ -1974,7 +1974,7 @@ function ModalDescuento({ datos, onGuardar, onCerrar }) {
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 420, maxWidth: 520 }}>
         <div className="modal-titulo">
-          {datos?.id ? '✏️ Editar descuento' : '➕ Nuevo descuento'}
+          {datos?.id ? 'Editar descuento' : 'Nuevo descuento'}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2103,7 +2103,7 @@ function TabMesas({ mesas, onNueva, onEditar, onToggle }) {
           </div>
         </div>
         <button className="btn btn-primario" onClick={onNueva}>
-          ➕ Nueva mesa
+          Nueva mesa
         </button>
       </div>
 
@@ -2118,7 +2118,7 @@ function TabMesas({ mesas, onNueva, onEditar, onToggle }) {
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
             }}
           >
-            <span style={{ fontSize: 28 }}>🪑</span>
+            <span style={{ fontSize: 28 }}>—</span>
             <div style={{ fontWeight: 700, textAlign: 'center' }}>{m.nombre}</div>
             <span className={`badge ${m.activo ? 'badge-verde' : 'badge-rojo'}`}>
               {m.activo ? 'Activa' : 'Inactiva'}
@@ -2126,14 +2126,14 @@ function TabMesas({ mesas, onNueva, onEditar, onToggle }) {
             <div style={{ display: 'flex', gap: 6 }}>
               <button className="btn btn-secundario" style={{ padding: '4px 8px', fontSize: 12 }}
                 onClick={() => onEditar(m)}>
-                ✏️
+                Editar
               </button>
               <button
                 className={`btn ${m.activo ? 'btn-peligro' : 'btn-exito'}`}
                 style={{ padding: '4px 8px', fontSize: 12 }}
                 onClick={() => onToggle(m.id)}
               >
-                {m.activo ? '🚫' : '✅'}
+                {m.activo ? 'Desactivar' : '✅ Activar'}
               </button>
             </div>
           </div>
@@ -2164,7 +2164,7 @@ function ModalMesa({ datos, onGuardar, onCerrar }) {
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 340 }}>
         <div className="modal-titulo">
-          {datos?.id ? '✏️ Editar mesa' : '➕ Nueva mesa'}
+          {datos?.id ? 'Editar mesa' : 'Nueva mesa'}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2200,7 +2200,7 @@ function ModalMesa({ datos, onGuardar, onCerrar }) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 function TabBaseCaja({ notificar }) {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
 
   const [historial,      setHistorial]      = useState([]);
   const [baseHoy,        setBaseHoy]        = useState(null);
@@ -2264,18 +2264,18 @@ function TabBaseCaja({ notificar }) {
     }
   };
 
-  if (cargando) return <div className="cargando">⏳ Cargando...</div>;
+  if (cargando) return <div className="cargando">Cargando...</div>;
 
   return (
     <div style={{ maxWidth: 700 }}>
       {/* Base del día actual */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-titulo">💵 Base de caja — Hoy ({hoy})</div>
+        <div className="card-titulo">Base de caja — Hoy ({hoy})</div>
 
         {editando ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="form-grupo">
-              <label className="form-label">💵 Efectivo en caja al inicio ($)</label>
+              <label className="form-label">Efectivo en caja al inicio ($)</label>
               <input
                 type="number"
                 min="0"
@@ -2286,7 +2286,7 @@ function TabBaseCaja({ notificar }) {
               />
             </div>
             <div className="form-grupo">
-              <label className="form-label">📱 Saldo Nequi disponible ($)</label>
+              <label className="form-label">Saldo Nequi disponible ($)</label>
               <input
                 type="number"
                 min="0"
@@ -2301,7 +2301,7 @@ function TabBaseCaja({ notificar }) {
                 onClick={guardarEdicion}
                 disabled={guardando}
               >
-                {guardando ? '⏳ Guardando...' : '✅ Guardar'}
+                {guardando ? 'Guardando...' : '✅ Guardar'}
               </button>
               <button
                 className="btn btn-secundario"
@@ -2316,11 +2316,11 @@ function TabBaseCaja({ notificar }) {
           <div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
-                <span style={{ color: 'var(--texto-suave)' }}>💵 Efectivo inicial</span>
+                <span style={{ color: 'var(--texto-suave)' }}>Efectivo inicial</span>
                 <span style={{ fontWeight: 700 }}>${baseHoy.efectivo_base.toLocaleString('es-CO')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
-                <span style={{ color: 'var(--texto-suave)' }}>📱 Nequi inicial</span>
+                <span style={{ color: 'var(--texto-suave)' }}>Nequi inicial</span>
                 <span style={{ fontWeight: 700 }}>${baseHoy.nequi_base.toLocaleString('es-CO')}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--texto-suave)' }}>
@@ -2328,7 +2328,7 @@ function TabBaseCaja({ notificar }) {
               </div>
             </div>
             <button className="btn btn-secundario" onClick={iniciarEdicion}>
-              ✏️ Corregir base de hoy
+              Corregir base de hoy
             </button>
           </div>
         ) : (
@@ -2337,7 +2337,7 @@ function TabBaseCaja({ notificar }) {
               No hay base de caja registrada para hoy.
             </div>
             <button className="btn btn-primario" onClick={iniciarEdicion}>
-              ➕ Registrar base de hoy
+              Registrar base de hoy
             </button>
           </div>
         )}
@@ -2345,7 +2345,7 @@ function TabBaseCaja({ notificar }) {
 
       {/* Historial */}
       <div className="card">
-        <div className="card-titulo">📅 Historial de bases registradas (últimos 30 días)</div>
+        <div className="card-titulo">Historial de bases registradas (últimos 30 días)</div>
         {historial.length === 0 ? (
           <div className="vacio">Sin registros aún</div>
         ) : (

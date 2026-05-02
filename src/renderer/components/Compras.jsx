@@ -35,7 +35,7 @@ export default function Compras() {
   const [modalCompra, setModalCompra]   = useState(null);
   const [modalManual, setModalManual]   = useState(false);
 
-  const hoy          = new Date().toISOString().split('T')[0];
+  const hoy          = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   const primerDiaMes = hoy.slice(0, 8) + '01';
 
   const cargar = useCallback(async () => {

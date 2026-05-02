@@ -26,11 +26,11 @@ export default function Gastos() {
   const [metodo, setMetodo]   = useState('efectivo');
   const [notasF, setNotasF]   = useState('');
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   const fechaInicio = (() => {
     const d = new Date();
     d.setDate(d.getDate() - diasRango);
-    return d.toISOString().split('T')[0];
+    return new Date(d - d.getTimezoneOffset() * 60_000).toISOString().split('T')[0];
   })();
 
   const cargar = useCallback(async () => {

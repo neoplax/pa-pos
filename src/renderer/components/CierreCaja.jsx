@@ -20,7 +20,7 @@ export default function CierreCaja() {
   const [obsDescuadre, setObsDescuadre]               = useState('');
   const [imprimiendo, setImprimiendo]                 = useState(false);
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
 
   const cargar = useCallback(async () => {
     try {
