@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVentasDomicilios:  (filtros)                                   => ipcRenderer.invoke('db:getVentasDomicilios', filtros),
   imprimirRecibo:       (datos)                                     => ipcRenderer.invoke('db:imprimirRecibo', datos),
   imprimirPrueba:       (opts)                                      => ipcRenderer.invoke('db:imprimirPrueba', opts),
+  abrirCajon:           ()                                          => ipcRenderer.invoke('db:abrirCajon'),
   asignarFactura:       (ventaId, facturaNum, efectivoRecibido)     => ipcRenderer.invoke('db:asignarFactura', ventaId, facturaNum, efectivoRecibido),
   getUltimaVenta:       ()                                          => ipcRenderer.invoke('db:getUltimaVenta'),
   getPrinters:          ()                                          => ipcRenderer.invoke('db:getPrinters'),

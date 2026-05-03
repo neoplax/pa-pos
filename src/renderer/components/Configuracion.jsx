@@ -1223,6 +1223,8 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
   const [autoPrint,     setAutoPrint]     = useState(cfg.auto_imprimir   === '1');
   const [impresora,     setImpresora]     = useState(cfg.impresora_nombre || '');
   const [puertoLinux,   setPuertoLinux]   = useState(cfg.puerto_linux     || '/dev/usb/lp0');
+  const [cajonActivo,   setCajonActivo]   = useState(cfg.cajon_activo    === '1');
+  const [cajonPin,      setCajonPin]      = useState(cfg.cajon_pin       || '2');
   const [impresoras,    setImpresoras]    = useState([]);
   const [guardando,     setGuardando]     = useState(false);
   const [imprimiendo,   setImprimiendo]   = useState(false);
@@ -1241,6 +1243,8 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
       await window.electronAPI.setConfig('auto_imprimir',    autoPrint ? '1' : '0');
       await window.electronAPI.setConfig('impresora_nombre', impresora);
       await window.electronAPI.setConfig('puerto_linux',     puertoLinux || '/dev/usb/lp0');
+      await window.electronAPI.setConfig('cajon_activo',     cajonActivo ? '1' : '0');
+      await window.electronAPI.setConfig('cajon_pin',        cajonPin || '2');
       notificar('✅ Configuración de impresora guardada', 'exito');
       onGuardar();
     } catch (err) {
@@ -1364,6 +1368,39 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
             <label htmlFor="autoPrint" style={{ cursor: 'pointer' }}>
               Imprimir automáticamente al cobrar
             </label>
+          </div>
+
+          {/* Cajón portamonedas */}
+          <div className="form-grupo">
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Cajón portamonedas</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <input type="checkbox" id="cajonActivo" checked={cajonActivo}
+                onChange={e => setCajonActivo(e.target.checked)} />
+              <label htmlFor="cajonActivo" style={{ cursor: 'pointer', fontSize: 13 }}>
+                Abrir cajón automáticamente al cobrar en efectivo o mixto
+              </label>
+            </div>
+            {cajonActivo && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingLeft: 4 }}>
+                <label style={{ fontSize: 13 }}>Pin del cajón:</label>
+                <select value={cajonPin} onChange={e => setCajonPin(e.target.value)}
+                  style={{ width: 80 }}>
+                  <option value="2">Pin 2</option>
+                  <option value="5">Pin 5</option>
+                </select>
+                <button
+                  className="btn btn-secundario"
+                  style={{ fontSize: 13, padding: '0 12px' }}
+                  onClick={async () => {
+                    const r = await window.electronAPI.abrirCajon();
+                    if (r?.ok) notificar('Cajón abierto', 'exito');
+                    else notificar('No se pudo abrir el cajón', 'error');
+                  }}
+                >
+                  Probar cajón
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>

@@ -11,7 +11,7 @@ const {
   patchRolesEmpleados, patchUnidadesV2, patchLimpiezaDatosPrueba, patchTocinetaV3,
   patchDatosHistoricosV2,
 } = require('../database/seed');
-const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters } = require('./print-service');
+const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters, abrirCajon } = require('./print-service');
 const syncService = require('../sync/syncService');
 
 function hashPin(pin) {
@@ -1072,6 +1072,19 @@ function setupIpcHandlers() {
     return imprimirPrueba({
       printerName: overrides.printerName  ?? cfgImpresora?.valor ?? null,
       puertoLinux: overrides.puertoLinux  ?? cfgPuerto?.valor    ?? '/dev/usb/lp0',
+    });
+  });
+
+  ipcMain.handle('db:abrirCajon', () => {
+    const cfgActivo    = db.prepare("SELECT valor FROM configuracion WHERE clave='cajon_activo'").get();
+    if (cfgActivo?.valor !== '1') return { ok: false, motivo: 'desactivado' };
+    const cfgPin       = db.prepare("SELECT valor FROM configuracion WHERE clave='cajon_pin'").get();
+    const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
+    const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
+    return abrirCajon({
+      pin:         cfgPin?.valor        || '2',
+      printerName: cfgImpresora?.valor  || null,
+      puertoLinux: cfgPuerto?.valor     || '/dev/usb/lp0',
     });
   });
 

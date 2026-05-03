@@ -350,6 +350,9 @@ export default function POS() {
             notificar('⚠️ Impresora no disponible — recibo guardado como .txt', 'info');
           }
         }
+        if (metodoPago === 'efectivo' || metodoPago === 'mixto') {
+          window.electronAPI.abrirCajon().catch(() => {});
+        }
         notificar(`✅ Venta #${result.ventaId} registrada — $${total.toLocaleString('es-CO')}`, 'exito');
         // Volver al selector: false = no re-guardar carrito, la mesa queda libre
         await volverSelectorMesas(false);

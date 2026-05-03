@@ -744,8 +744,6 @@ function patchDatosHistoricosV2(db) {
   const yaFue = db.prepare("SELECT valor FROM configuracion WHERE clave='historico_v2'").get();
   if (yaFue) return;
 
-  const existeCaja = (fecha) => db.prepare('SELECT id FROM caja WHERE fecha=?').get(fecha);
-
   const insVenta = db.prepare(`
     INSERT INTO ventas (fecha, empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, factura_num)
     VALUES (?,?,?,?,?,?,?)
@@ -762,6 +760,15 @@ function patchDatosHistoricosV2(db) {
     INSERT INTO transferencias_internas (fecha, concepto, valor, de_medio, a_medio, empleado)
     VALUES (?,?,?,?,?,?)
   `);
+
+  const existeDia = (fecha) => {
+    if (db.prepare('SELECT id FROM caja WHERE fecha=?').get(fecha)) return true;
+    return !!db.prepare("SELECT id FROM ventas WHERE date(fecha)=? AND empleado!='Importado' LIMIT 1").get(fecha);
+  };
+  const hayGastoExacto = (fecha, desc, monto) =>
+    !!db.prepare('SELECT id FROM gastos WHERE date(fecha)=? AND descripcion=? AND monto=? LIMIT 1').get(fecha, desc, monto);
+  const hayTransExacta = (fecha, concepto, valor) =>
+    !!db.prepare('SELECT id FROM transferencias_internas WHERE fecha=? AND concepto=? AND valor=? LIMIT 1').get(fecha, concepto, valor);
 
   db.transaction(() => {
 
@@ -781,7 +788,7 @@ function patchDatosHistoricosV2(db) {
     ];
 
     for (const [fecha, ef, nq, total, gastosTot, uf] of diasVentas) {
-      if (existeCaja(fecha)) continue;
+      if (existeDia(fecha)) continue;
       if (ef > 0) insVenta.run(`${fecha} 12:00:00`, 'Importado', ef, 'efectivo', 0, 0, uf);
       if (nq > 0) insVenta.run(`${fecha} 12:30:00`, 'Importado', nq, 'nequi',    0, 0, 0);
       insCaja.run(fecha, ef, nq, total, gastosTot, total - gastosTot, 'Importado', 'Datos históricos', 0, '');
@@ -877,12 +884,16 @@ function patchDatosHistoricosV2(db) {
     ];
 
     for (const [fecha, desc, monto, cat, metodo, empl, notas] of gastos) {
-      insGasto.run(`${fecha} 08:00:00`, desc, monto, cat, metodo, empl, notas);
+      if (!hayGastoExacto(fecha, desc, monto)) {
+        insGasto.run(`${fecha} 08:00:00`, desc, monto, cat, metodo, empl, notas);
+      }
     }
 
     // ── TRANSFERENCIAS INTERNAS 28 Abril ──────────────────────────────────
-    insTrans.run('2026-04-28', 'Cambio Efectivo → Nequi', 70000, 'efectivo', 'nequi', '');
-    insTrans.run('2026-04-28', 'Cambio Nequi → Efectivo', 50000, 'nequi', 'efectivo', '');
+    if (!hayTransExacta('2026-04-28', 'Cambio Efectivo → Nequi', 70000))
+      insTrans.run('2026-04-28', 'Cambio Efectivo → Nequi', 70000, 'efectivo', 'nequi', '');
+    if (!hayTransExacta('2026-04-28', 'Cambio Nequi → Efectivo', 50000))
+      insTrans.run('2026-04-28', 'Cambio Nequi → Efectivo', 50000, 'nequi', 'efectivo', '');
 
     // ── Actualizar consecutivo de facturas a 2198 ─────────────────────────
     db.prepare(`

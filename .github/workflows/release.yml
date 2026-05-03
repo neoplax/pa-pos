@@ -14,6 +14,16 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: package.json version ($PKG_VERSION) != tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "Version OK: $PKG_VERSION"
       - name: Install dependencies
         run: npm install
       - name: Build Windows
@@ -29,6 +39,20 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
+      - name: Install fpm and packaging dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install fpm --no-document
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: package.json version ($PKG_VERSION) != tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "Version OK: $PKG_VERSION"
       - name: Install dependencies
         run: npm install
       - name: Build Linux
