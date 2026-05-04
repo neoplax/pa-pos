@@ -1222,19 +1222,30 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
   const [facturaInicio, setFacturaInicio] = useState(cfg.factura_inicio   || '2083');
   const [autoPrint,     setAutoPrint]     = useState(cfg.auto_imprimir   === '1');
   const [impresora,     setImpresora]     = useState(cfg.impresora_nombre || '');
+  const [puertoUsbWin,  setPuertoUsbWin]  = useState(cfg.puerto_usb_win   || 'USB001');
   const [puertoLinux,   setPuertoLinux]   = useState(cfg.puerto_linux     || '/dev/usb/lp0');
   const [cajonActivo,   setCajonActivo]   = useState(cfg.cajon_activo    === '1');
   const [cajonPin,      setCajonPin]      = useState(cfg.cajon_pin       || '2');
-  const [impresoras,    setImpresoras]    = useState([]);
+  const [detectados,    setDetectados]    = useState([]);
+  const [detectando,    setDetectando]    = useState(false);
   const [guardando,     setGuardando]     = useState(false);
   const [imprimiendo,   setImprimiendo]   = useState(false);
 
   const consecutivoActual = cfg.factura_consecutivo || '0';
   const esWindows = navigator.platform?.toLowerCase().includes('win');
 
-  useEffect(() => {
-    window.electronAPI.getPrinters().then(lista => setImpresoras(lista || [])).catch(() => {});
-  }, []);
+  const detectarImpresora = async () => {
+    setDetectando(true);
+    try {
+      const lista = await window.electronAPI.getPrintersDetailed();
+      setDetectados(lista || []);
+      if (!lista || lista.length === 0) notificar('No se detectaron impresoras', 'info');
+    } catch (_) {
+      notificar('Error al detectar impresoras', 'error');
+    } finally {
+      setDetectando(false);
+    }
+  };
 
   const guardar = async () => {
     setGuardando(true);
@@ -1242,10 +1253,11 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
       await window.electronAPI.setConfig('factura_inicio',   facturaInicio || '2083');
       await window.electronAPI.setConfig('auto_imprimir',    autoPrint ? '1' : '0');
       await window.electronAPI.setConfig('impresora_nombre', impresora);
+      await window.electronAPI.setConfig('puerto_usb_win',   puertoUsbWin || 'USB001');
       await window.electronAPI.setConfig('puerto_linux',     puertoLinux || '/dev/usb/lp0');
       await window.electronAPI.setConfig('cajon_activo',     cajonActivo ? '1' : '0');
       await window.electronAPI.setConfig('cajon_pin',        cajonPin || '2');
-      notificar('✅ Configuración de impresora guardada', 'exito');
+      notificar('Configuración de impresora guardada', 'exito');
       onGuardar();
     } catch (err) {
       notificar('❌ Error guardando configuración', 'error');
@@ -1259,6 +1271,7 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
     try {
       const result = await window.electronAPI.imprimirPrueba({
         printerName: impresora    || null,
+        puertoUsb:   puertoUsbWin || 'USB001',
         puertoLinux: puertoLinux  || '/dev/usb/lp0',
       });
       if (result?.ok) {
@@ -1286,8 +1299,8 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
 
           {esWindows ? (
             <div className="alerta azul">
-              <strong>Windows detectado.</strong> Selecciona la impresora 3nStar y se enviará
-              ESC/POS directo al puerto USB. Sin diálogo de impresión del sistema.
+              <strong>Windows detectado.</strong> Los recibos se envían ESC/POS directo al
+              puerto USB configurado. Sin diálogo de impresión del sistema.
             </div>
           ) : (
             <div className="alerta azul">
@@ -1297,7 +1310,66 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
             </div>
           )}
 
-          {/* Puerto Linux (siempre visible) */}
+          {/* Configuración Windows */}
+          <div className="form-grupo">
+            <label className="form-label">Nombre de impresora (Windows)</label>
+            <input
+              type="text"
+              value={impresora}
+              onChange={e => setImpresora(e.target.value)}
+              placeholder="PrinterPOS-80"
+              style={{ width: 260 }}
+            />
+            <div className="texto-suave" style={{ fontSize: 12, marginTop: 4 }}>
+              Nombre en el spooler de Windows (ej: <code>PrinterPOS-80</code>)
+            </div>
+          </div>
+
+          <div className="form-grupo">
+            <label className="form-label">Puerto USB Windows</label>
+            <input
+              type="text"
+              value={puertoUsbWin}
+              onChange={e => setPuertoUsbWin(e.target.value)}
+              placeholder="USB001"
+              style={{ width: 140 }}
+            />
+            <div className="texto-suave" style={{ fontSize: 12, marginTop: 4 }}>
+              Puerto asignado en el administrador de dispositivos (ej: <code>USB001</code>)
+            </div>
+          </div>
+
+          <div className="form-grupo">
+            <button
+              className="btn btn-secundario"
+              style={{ fontSize: 13 }}
+              onClick={detectarImpresora}
+              disabled={detectando}
+            >
+              {detectando ? 'Detectando...' : 'Detectar impresora automáticamente'}
+            </button>
+            {detectados.length > 0 && (
+              <div style={{ marginTop: 8, fontSize: 13 }}>
+                <div className="texto-suave" style={{ marginBottom: 4 }}>Impresoras detectadas — haz clic para usar:</div>
+                {detectados.map(d => (
+                  <div
+                    key={d.name}
+                    style={{
+                      display: 'flex', gap: 8, alignItems: 'center',
+                      padding: '4px 0', cursor: 'pointer',
+                    }}
+                    onClick={() => { setImpresora(d.name); setPuertoUsbWin(d.port); }}
+                  >
+                    <span style={{ fontWeight: impresora === d.name ? 700 : 400 }}>{d.name}</span>
+                    <span className="texto-suave">→ {d.port}</span>
+                    {impresora === d.name && <span style={{ color: 'var(--verde)' }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Puerto Linux */}
           <div className="form-grupo">
             <label className="form-label">Puerto Linux (dispositivo USB)</label>
             <input
@@ -1310,42 +1382,6 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
             <div className="texto-suave" style={{ fontSize: 12, marginTop: 4 }}>
               Impresora 3nStar detectada en <code>/dev/usb/lp0</code> (Vendor: 1fc9 / Product: 2016)
             </div>
-          </div>
-
-          {/* Selector de impresora Windows */}
-          <div className="form-grupo">
-            <label className="form-label">
-              Impresora Windows
-              {impresoras.length === 0 && (
-                <span className="texto-suave" style={{ fontSize: 12, marginLeft: 8 }}>
-                  (no se detectaron impresoras)
-                </span>
-              )}
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select
-                value={impresora}
-                onChange={e => setImpresora(e.target.value)}
-                style={{ flex: 1 }}
-              >
-                <option value="">— Sin impresora Windows —</option>
-                {impresoras.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <button
-                className="btn btn-secundario"
-                style={{ fontSize: 13, padding: '0 12px', flexShrink: 0 }}
-                onClick={() => window.electronAPI.getPrinters().then(lista => setImpresoras(lista || []))}
-              >
-                ↺
-              </button>
-            </div>
-            {impresora && (
-              <div className="texto-suave" style={{ fontSize: 12, marginTop: 4 }}>
-                Seleccionada: <strong>{impresora}</strong>
-              </div>
-            )}
           </div>
 
           <div className="form-grupo">

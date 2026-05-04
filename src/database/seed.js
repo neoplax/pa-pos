@@ -911,6 +911,345 @@ function patchDatosHistoricosV2(db) {
   console.log('[DB] patchDatosHistoricosV2: histórico 17 Abr–1 May importado.');
 }
 
+// Corregir y completar datos 29 Abr–2 May 2026:
+// 29 Abr: día sin operación → eliminar cualquier registro
+// 30 Abr: asegurar gastos correctos (pueden faltar si V2 no corrió antes del cierre)
+// 01 May: agregar gasto faltante "El Gran Surtidor" que no estaba en V2
+// 02 May: insertar ventas+caja+gastos si no existen
+// Actualizar factura_consecutivo a 2212 (próximo = 2213)
+function patchDatosHistoricosV3(db) {
+  const hecho = db.prepare("SELECT valor FROM configuracion WHERE clave='historico_v3'").get();
+  if (hecho?.valor === '1') return;
+
+  // Día ya tiene datos reales si hay caja cerrada o ventas no-importadas
+  const existeDia = (fecha) => {
+    if (db.prepare('SELECT id FROM caja WHERE fecha=?').get(fecha)) return true;
+    return !!db.prepare("SELECT id FROM ventas WHERE date(fecha)=? AND empleado!='Importado' LIMIT 1").get(fecha);
+  };
+
+  // Gasto idéntico ya registrado (fecha + descripción + monto)
+  const hayGastoExacto = (fecha, desc, monto) =>
+    !!db.prepare('SELECT id FROM gastos WHERE date(fecha)=? AND descripcion=? AND monto=? LIMIT 1').get(fecha, desc, monto);
+
+  const insVenta = db.prepare(
+    'INSERT INTO ventas (fecha, empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, factura_num) VALUES (?,?,?,?,?,?,?)'
+  );
+  const insCaja = db.prepare(
+    'INSERT INTO caja (fecha, efectivo, nequi, total_ventas, gastos, utilidad, empleado, notas, descuadre, observacion_descuadre, cerrada) VALUES (?,?,?,?,?,?,?,?,?,?,1)'
+  );
+  const insGasto = db.prepare(
+    'INSERT INTO gastos (fecha, descripcion, monto, categoria, metodo_pago, empleado, notas) VALUES (?,?,?,?,?,?,?)'
+  );
+
+  db.transaction(() => {
+
+    // ── 29 Abril: día sin operación — borrar todo lo que exista ─────────────
+    const ids29 = db.prepare("SELECT id FROM ventas WHERE date(fecha)='2026-04-29'").all().map(r => r.id);
+    if (ids29.length > 0) {
+      const ph = ids29.map(() => '?').join(',');
+      db.prepare(`DELETE FROM detalle_ventas WHERE venta_id IN (${ph})`).run(...ids29);
+      db.prepare("DELETE FROM ventas WHERE date(fecha)='2026-04-29'").run();
+    }
+    db.prepare("DELETE FROM gastos WHERE date(fecha)='2026-04-29'").run();
+    db.prepare("DELETE FROM caja WHERE fecha='2026-04-29'").run();
+
+    // ── 30 Abril: asegurar gastos correctos ──────────────────────────────────
+    // Ef: $177.000 | Nq: $50.000 | Total: $227.000 | Facturas: 2171-2184
+    // Gastos: cuota $80k + insumos $237k + Sofía $23k + Juan $8.750 = $348.750
+    for (const [fecha, desc, monto, cat, metodo, empl] of [
+      ['2026-04-30', 'Don Rodrigo — Cuota fija — cesión del local', 80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+      ['2026-04-30', 'Don Rodrigo — Pan, Salchicha, Maíz',         237000,  'Compra insumos', 'efectivo', 'Don Rodrigo'],
+      ['2026-04-30', 'Pago Sofía — Nómina',                         23000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-04-30', 'Pago Juan — Gastos',                           8750,  'Nomina',          'nequi',   'Juan'],
+    ]) {
+      if (!hayGastoExacto(fecha, desc, monto))
+        insGasto.run(`${fecha} 08:00:00`, desc, monto, cat, metodo, empl, '');
+    }
+
+    // ── 1 Mayo: agregar gasto faltante que no estaba en V2 ───────────────────
+    // Ef: $416.000 | Nq: $125.500 | Total: $541.500 | Facturas: 2185-2198
+    // Gastos: Sofía $42k + Juan $2.8k + Gran Surtidor $13.256 = $58.056
+    for (const [fecha, desc, monto, cat, metodo, empl] of [
+      ['2026-05-01', 'Pago Sofía — Nómina',                          42000, 'Nomina',          'nequi',    'Sofía'],
+      ['2026-05-01', 'Pago Juan — Gastos',                            2800, 'Nomina',          'nequi',    'Juan'],
+      ['2026-05-01', 'El Gran Surtidor — Cilantro, Tomate, Cebolla', 13256, 'Compra insumos',  'efectivo', ''],
+    ]) {
+      if (!hayGastoExacto(fecha, desc, monto))
+        insGasto.run(`${fecha} 08:00:00`, desc, monto, cat, metodo, empl, '');
+    }
+
+    // ── 2 Mayo: insertar solo si no hay datos propios para esa fecha ─────────
+    // Ef: $112.000 | Nq: $153.500 | Total: $265.500 | Facturas: 2199-2212
+    // Gastos: Sofía $15k | Utilidad: $250.500
+    if (!existeDia('2026-05-02')) {
+      insVenta.run('2026-05-02 12:00:00', 'Importado', 112000, 'efectivo', 0, 0, 2212);
+      insVenta.run('2026-05-02 12:30:00', 'Importado', 153500, 'nequi',    0, 0, 0);
+      insCaja.run('2026-05-02', 112000, 153500, 265500, 15000, 250500, 'Importado', 'Datos históricos', 0, '');
+    }
+    if (!hayGastoExacto('2026-05-02', 'Pago Sofía — Nómina', 15000))
+      insGasto.run('2026-05-02 08:00:00', 'Pago Sofía — Nómina', 15000, 'Nomina', 'nequi', 'Sofía', '');
+
+    // ── Actualizar consecutivo: 2212 emitida → próxima será 2213 ─────────────
+    db.prepare(`
+      INSERT INTO configuracion (clave, valor) VALUES ('factura_consecutivo','2212')
+      ON CONFLICT(clave) DO UPDATE SET valor=
+        CASE WHEN CAST(excluded.valor AS INTEGER) > CAST(valor AS INTEGER)
+             THEN excluded.valor ELSE valor END
+    `).run();
+
+    db.prepare("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('historico_v3','1')").run();
+
+  })();
+
+  // ── Verificación final ────────────────────────────────────────────────────
+  const totAbril = db.prepare(
+    "SELECT COALESCE(SUM(total),0) as t FROM ventas WHERE date(fecha) BETWEEN '2026-04-17' AND '2026-04-30'"
+  ).get().t;
+  const totMayo12 = db.prepare(
+    "SELECT COALESCE(SUM(total),0) as t FROM ventas WHERE date(fecha) IN ('2026-05-01','2026-05-02')"
+  ).get().t;
+  const sigFactura = parseInt(
+    db.prepare("SELECT valor FROM configuracion WHERE clave='factura_consecutivo'").get()?.valor || '0'
+  ) + 1;
+
+  console.log('[DB] patchDatosHistoricosV3: 29 Abr eliminado, 30 Abr confirmado, 1 May corregido, 2 May agregado.');
+  console.log(`[DB] Total ventas abril (17-30): $${totAbril.toLocaleString('es-CO')} (esperado: $2.756.000)`);
+  console.log(`[DB] Total ventas mayo 1-2:      $${totMayo12.toLocaleString('es-CO')} (esperado: $807.000)`);
+  console.log(`[DB] Próximo consecutivo:        ${sigFactura} (esperado: 2213)`);
+
+  if (totMayo12 !== 807000) {
+    console.warn(`[DB] ATENCIÓN: total mayo 1-2 es $${totMayo12.toLocaleString('es-CO')}, esperado $807.000`);
+  }
+  if (sigFactura !== 2213) {
+    console.warn(`[DB] ATENCIÓN: próximo consecutivo es ${sigFactura}, esperado 2213`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIMPIEZA Y RECONSTRUCCIÓN COMPLETA DE DATOS HISTÓRICOS
+// Borra TODOS los registros anteriores al día de hoy (ventas, caja, gastos,
+// transferencias_internas) y reinsertta con exactamente los datos del CSV.
+// Marca V2 y V3 como ejecutados para que jamás vuelvan a insertar.
+// GUARDA: 'limpieza_completa' = '1' — solo corre una vez.
+// ─────────────────────────────────────────────────────────────────────────────
+function patchLimpiezaCompleta(db) {
+  const hecho = db.prepare("SELECT valor FROM configuracion WHERE clave='limpieza_completa'").get();
+  if (hecho?.valor === '1') return;
+
+  db.transaction(() => {
+
+    // ── PASO 1: Eliminar todos los registros históricos (antes de hoy) ────────
+    db.prepare(`
+      DELETE FROM detalle_ventas
+      WHERE venta_id IN (SELECT id FROM ventas WHERE date(fecha) < date('now','localtime'))
+    `).run();
+    db.prepare("DELETE FROM ventas WHERE date(fecha) < date('now','localtime')").run();
+    db.prepare("DELETE FROM caja   WHERE date(fecha) < date('now','localtime')").run();
+    db.prepare("DELETE FROM gastos WHERE date(fecha) < date('now','localtime')").run();
+    db.prepare("DELETE FROM transferencias_internas WHERE fecha < date('now','localtime')").run();
+
+    // Evitar que V2 y V3 re-inserten datos ya limpios
+    db.prepare("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('historico_v2','1')").run();
+    db.prepare("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('historico_v3','1')").run();
+
+    // ── PASO 2: Reinsertar ventas y caja exactos del CSV ─────────────────────
+    // Una fila efectivo y una fila nequi por día (cuando aplique).
+    // caja.gastos = suma exacta de todos los gastos registrados ese día.
+    // caja.utilidad = total_ventas - gastos.
+    // factura_num = última factura emitida en el día (asignada a la fila efectivo).
+    const insVenta = db.prepare(
+      'INSERT INTO ventas (fecha, empleado, total, metodo_pago, monto_efectivo_mixto, monto_nequi_mixto, factura_num) VALUES (?,?,?,?,?,?,?)'
+    );
+    const insCaja = db.prepare(
+      'INSERT INTO caja (fecha, efectivo, nequi, total_ventas, gastos, utilidad, empleado, notas, descuadre, observacion_descuadre, cerrada) VALUES (?,?,?,?,?,?,?,?,?,?,1)'
+    );
+
+    // [fecha, ef, nq, total, gastos_caja, utilidad, ultimo_factura]
+    const diasVentas = [
+      ['2026-04-17', 188000,       50000, 238000,  80000,    158000, 2041],
+      ['2026-04-18', 232500,       91000, 323500,  99600,    223900, 2064],
+      ['2026-04-19', 118500,       36000, 154500, 140828,     13672, 2072],
+      ['2026-04-20', 114500,       41000, 155500, 207000,    -51500, 2082],
+      ['2026-04-21', 138000,       69000, 207000, 143600,     63400, 2094],
+      ['2026-04-23',  90000,           0,  90000, 385421,   -295421, 2099],
+      ['2026-04-24', 372000,      108500, 480500, 128200,    352300, 2128],
+      ['2026-04-25', 123000,      165500, 288500, 340559,    -52059, 2144],
+      ['2026-04-26', 237500,        3000, 240500, 124263,    116237, 2157],
+      ['2026-04-27',  76000,           0,  76000, 199800,   -123800, 2162],
+      ['2026-04-28',  78500,       66500, 145000, 387247,   -242247, 2170],
+      ['2026-04-30', 177000,       50000, 227000, 348750,   -121750, 2184],
+      ['2026-05-01', 416000,      125500, 541500,  58056,    483444, 2198],
+      ['2026-05-02', 112000,      153500, 265500,  15000,    250500, 2212],
+    ];
+
+    for (const [fecha, ef, nq, total, gastosCaja, utilidad, uf] of diasVentas) {
+      if (ef > 0) insVenta.run(`${fecha} 12:00:00`, 'Importado', ef, 'efectivo', 0, 0, uf);
+      if (nq > 0) insVenta.run(`${fecha} 12:30:00`, 'Importado', nq, 'nequi',    0, 0, 0);
+      insCaja.run(fecha, ef, nq, total, gastosCaja, utilidad, 'Importado', 'Datos históricos', 0, '');
+    }
+
+    // ── PASO 3: Reinsertar gastos exactos del CSV ─────────────────────────────
+    // [fecha, descripcion, monto, categoria, metodo_pago, empleado]
+    const insGasto = db.prepare(
+      'INSERT INTO gastos (fecha, descripcion, monto, categoria, metodo_pago, empleado, notas) VALUES (?,?,?,?,?,?,?)'
+    );
+
+    const gastos = [
+      // ── 17 Abril ─────────────────────────────────────────────────────────
+      ['2026-04-17', 'Don Rodrigo — Cuota fija — cesión del local', 80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+
+      // ── 18 Abril ──────────────────────────────────────────────────────────
+      // gastos: 4600 + 15000 + 80000 = 99600
+      ['2026-04-18', 'El Gran Surtidor — Lechuga, Palillos',                 4600,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-18', 'Pago Sofía — Nómina',                                 15000,  'Nomina',          'efectivo', 'Sofía'],
+      ['2026-04-18', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',     'efectivo', 'Don Rodrigo'],
+
+      // ── 19 Abril ──────────────────────────────────────────────────────────
+      // gastos: 24828 + 36000 + 80000 = 140828
+      ['2026-04-19', 'El Gran Surtidor — Repollo, Zanahoria, Cebolla, Sal, Azúcar, Pimienta', 24828, 'Compra insumos', 'efectivo', ''],
+      ['2026-04-19', 'Pago Sofía — Nómina',                                 36000,  'Nomina',          'efectivo', 'Sofía'],
+      ['2026-04-19', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',     'efectivo', 'Don Rodrigo'],
+
+      // ── 20 Abril ──────────────────────────────────────────────────────────
+      // gastos: 4800 + 70600 + 15600 + 36000 + 80000 = 207000
+      ['2026-04-20', 'El Gran Surtidor — Azúcar, Cilantro',                  4800,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-20', 'FROZEN — Salsas Mayo-Mostaza, Mayonesa, Tomate',      70600,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-20', 'Desayuno — Mónica y Laura',                           15600,  'otro',            'nequi',   ''],
+      ['2026-04-20', 'Pago Sofía — Nómina',                                 36000,  'Nomina',          'efectivo', 'Sofía'],
+      ['2026-04-20', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',     'efectivo', 'Don Rodrigo'],
+
+      // ── 21 Abril ──────────────────────────────────────────────────────────
+      // gastos: 1600 + 12000 + 50000 + 80000 = 143600
+      ['2026-04-21', 'El Gran Surtidor — Lechuga',                           1600,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-21', 'Félix — Pimienta, Paprika',                           12000,  'Compra insumos', 'nequi',   ''],
+      ['2026-04-21', 'Postobón — Hit tropical, Hit mango, Pepsi, Colombianita, Manzana x12', 50000, 'Compra insumos', 'efectivo', ''],
+      ['2026-04-21', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+
+      // ── 22 Abril (solo gasto, sin ventas ni caja) ─────────────────────────
+      ['2026-04-22', 'Pago Juan — Nómina',                                  18000,  'Nomina',          'nequi',   'Juan'],
+
+      // ── 23 Abril ──────────────────────────────────────────────────────────
+      // gastos: 37599 + 7830 + 23992 + 180000 + 20000 + 80000 + 36000 = 385421
+      ['2026-04-23', 'Insumos — Servilletas, Guantes Nitrilo, Bolsa Negra', 37599,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-23', 'Imperio de las Carnes — Queso costeño',                7830,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-23', 'El Gran Surtidor — Cebolla, Tomate, Limón',           23992,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-23', 'Don Rodrigo — Panes y Salchichas',                   180000,  'Compra insumos', 'nequi',   'Don Rodrigo'],
+      ['2026-04-23', 'Don Rodrigo — Panes y Salchichas (complemento)',      20000,  'Compra insumos', 'efectivo', 'Don Rodrigo'],
+      ['2026-04-23', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+      ['2026-04-23', 'Pago Sofía — Nómina',                                 36000,  'Nomina',         'efectivo', 'Sofía'],
+
+      // ── 24 Abril ──────────────────────────────────────────────────────────
+      // gastos: 3200 + 45000 + 80000 = 128200
+      ['2026-04-24', 'El Gran Surtidor — Lechuga x2',                        3200,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-24', 'Pago Sofía — Nómina',                                 45000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-04-24', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+
+      // ── 25 Abril ──────────────────────────────────────────────────────────
+      // gastos: 13031+1928+63000+4000+42000+15000+80000+30000+91600 = 340559
+      ['2026-04-25', 'El Gran Surtidor — Vinagre, Cilantro, Lechuga, Limón, Cebolla', 13031, 'Compra insumos', 'efectivo', ''],
+      ['2026-04-25', 'El Gran Surtidor — Tomate',                            1928,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-25', 'Santa Helena — Queso costeño, Queso tajado',          63000,  'Compra insumos', 'nequi',   ''],
+      ['2026-04-25', 'Pago Juan — Nómina',                                   4000,  'Nomina',          'nequi',   'Juan'],
+      ['2026-04-25', 'Pago Sofía — Nómina',                                 42000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-04-25', 'Pago — Varios',                                       15000,  'otro',            'nequi',   ''],
+      ['2026-04-25', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+      ['2026-04-25', 'Pago Juan — Salida',                                  30000,  'Nomina',          'efectivo', 'Juan'],
+      ['2026-04-25', 'Don Rodrigo — Pan, Maíz, Porta perros',               91600,  'Compra insumos', 'efectivo', 'Don Rodrigo'],
+
+      // ── 26 Abril ──────────────────────────────────────────────────────────
+      // gastos: 7863 + 80000 + 8400 + 10000 + 18000 = 124263
+      ['2026-04-26', 'El Gran Surtidor — Cebolla, Tomate',                   7863,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-26', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+      ['2026-04-26', 'Pago Juan — Carro Casa',                               8400,  'Nomina',          'nequi',   'Juan'],
+      ['2026-04-26', 'Pago Juan — Nómina Carne',                            10000,  'Nomina',          'nequi',   'Juan'],
+      ['2026-04-26', 'Pago Sofía — Nómina',                                 18000,  'Nomina',          'nequi',   'Sofía'],
+
+      // ── 27 Abril ──────────────────────────────────────────────────────────
+      // gastos: 6600 + 5000 + 23000 + 18000 + 67200 + 80000 = 199800
+      ['2026-04-27', 'Pago Juan — Gastos',                                   6600,  'Nomina',          'nequi',   'Juan'],
+      ['2026-04-27', 'Pago Juan — Gastos',                                   5000,  'Nomina',          'efectivo', 'Juan'],
+      ['2026-04-27', 'Santa Helena — Queso costeño',                        23000,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-27', 'Pago Sofía — Nómina',                                 18000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-04-27', 'FROZEN — Salsa Tártara, Papas Fritas',                67200,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-27', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+
+      // ── 28 Abril ──────────────────────────────────────────────────────────
+      // gastos: 3000+10107+80000+13700+133700+133484+13256 = 387247
+      ['2026-04-28', 'El Gran Surtidor — Cilantro, Lechuga',                 3000,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-28', 'El Gran Surtidor — Tomate, Cebolla',                  10107,  'Compra insumos', 'efectivo', ''],
+      ['2026-04-28', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'nequi',    'Don Rodrigo'],
+      ['2026-04-28', 'Pago Juan — Gastos',                                  13700,  'Nomina',          'nequi',   'Juan'],
+      ['2026-04-28', 'Servicio Luz — Servicios Públicos',                  133700,  'Servicios',       'efectivo', ''],
+      ['2026-04-28', 'Coca-Cola — CC250, CC400, QTO, Agua sin gas, Agua con gas', 133484, 'Compra insumos', 'efectivo', ''],
+      ['2026-04-28', 'El Gran Surtidor — Cilantro, Tomate, Cebolla',        13256,  'Compra insumos', 'efectivo', ''],
+
+      // ── 30 Abril ──────────────────────────────────────────────────────────
+      // gastos: 80000 + 237000 + 23000 + 8750 = 348750
+      ['2026-04-30', 'Don Rodrigo — Cuota fija — cesión del local',         80000,  'Cuota local',    'efectivo', 'Don Rodrigo'],
+      ['2026-04-30', 'Don Rodrigo — Pan, Salchicha, Maíz',                237000,  'Compra insumos', 'efectivo', 'Don Rodrigo'],
+      ['2026-04-30', 'Pago Sofía — Nómina',                                 23000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-04-30', 'Pago Juan — Gastos',                                   8750,  'Nomina',          'nequi',   'Juan'],
+
+      // ── 1 Mayo ────────────────────────────────────────────────────────────
+      // gastos: 42000 + 2800 + 13256 = 58056
+      ['2026-05-01', 'Pago Sofía — Nómina',                                 42000,  'Nomina',          'nequi',   'Sofía'],
+      ['2026-05-01', 'Pago Juan — Gastos',                                   2800,  'Nomina',          'nequi',   'Juan'],
+      ['2026-05-01', 'El Gran Surtidor — Cilantro, Tomate, Cebolla',        13256,  'Compra insumos', 'efectivo', ''],
+
+      // ── 2 Mayo ────────────────────────────────────────────────────────────
+      ['2026-05-02', 'Pago Sofía — Nómina',                                 15000,  'Nomina',          'nequi',   'Sofía'],
+    ];
+
+    for (const [fecha, desc, monto, cat, metodo, empl] of gastos) {
+      insGasto.run(`${fecha} 08:00:00`, desc, monto, cat, metodo, empl, '');
+    }
+
+    // ── Transferencias internas 28 Abril ──────────────────────────────────────
+    // Se registran en tabla separada — NO afectan totales de caja
+    const insTrans = db.prepare(
+      'INSERT INTO transferencias_internas (fecha, concepto, valor, de_medio, a_medio, empleado) VALUES (?,?,?,?,?,?)'
+    );
+    insTrans.run('2026-04-28', 'Cambio Efectivo → Nequi', 70000, 'efectivo', 'nequi', '');
+    insTrans.run('2026-04-28', 'Cambio Nequi → Efectivo', 50000, 'nequi', 'efectivo', '');
+
+    // ── PASO 5: Actualizar consecutivo — última factura emitida = 2212 ────────
+    // Próxima factura que generará la app = 2213
+    db.prepare(`
+      INSERT INTO configuracion (clave, valor) VALUES ('factura_consecutivo','2212')
+      ON CONFLICT(clave) DO UPDATE SET valor='2212'
+    `).run();
+
+    // Marcar como ejecutado (guard permanente)
+    db.prepare("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES ('limpieza_completa','1')").run();
+
+  })();
+
+  // ── PASO 4: Verificación final ────────────────────────────────────────────
+  const totAbril = db.prepare(
+    "SELECT COALESCE(SUM(total),0) AS t FROM ventas WHERE date(fecha) BETWEEN '2026-04-17' AND '2026-04-30'"
+  ).get().t;
+  const totMayo12 = db.prepare(
+    "SELECT COALESCE(SUM(total),0) AS t FROM ventas WHERE date(fecha) IN ('2026-05-01','2026-05-02')"
+  ).get().t;
+  const totGastos = db.prepare(
+    "SELECT COALESCE(SUM(monto),0) AS t FROM gastos WHERE date(fecha) BETWEEN '2026-04-17' AND '2026-05-02'"
+  ).get().t;
+  const sigFactura = parseInt(
+    db.prepare("SELECT valor FROM configuracion WHERE clave='factura_consecutivo'").get()?.valor || '0'
+  ) + 1;
+
+  console.log('[DB] patchLimpiezaCompleta: BD reconstruida desde CSV.');
+  console.log(`[DB]   Total ventas abril (17-30): $${totAbril.toLocaleString('es-CO')}  (esperado: $2.808.500)`);
+  console.log(`[DB]   Total ventas mayo 1-2:      $${totMayo12.toLocaleString('es-CO')}  (esperado: $807.000)`);
+  console.log(`[DB]   Total gastos abr+may:       $${totGastos.toLocaleString('es-CO')}`);
+  console.log(`[DB]   Próximo consecutivo:        ${sigFactura}  (esperado: 2213)`);
+
+  if (totMayo12 !== 807000)
+    console.warn(`[DB] ⚠ mayo 1-2: $${totMayo12.toLocaleString('es-CO')}, esperado $807.000`);
+  if (sigFactura !== 2213)
+    console.warn(`[DB] ⚠ consecutivo: ${sigFactura}, esperado 2213`);
+}
+
 function patchLimpiezaDatosPrueba(db) {
   db.transaction(() => {
     db.prepare(`
@@ -941,4 +1280,6 @@ module.exports = {
   patchLimpiezaDatosPrueba,
   patchTocinetaV3,
   patchDatosHistoricosV2,
+  patchDatosHistoricosV3,
+  patchLimpiezaCompleta,
 };

@@ -1,5 +1,5 @@
 // Handlers IPC - todas las operaciones de base de datos
-const { ipcMain, app } = require('electron');
+const { ipcMain, app, shell } = require('electron');
 const crypto = require('crypto');
 const { getDB } = require('../database');
 const { runMigrations } = require('../database/migrations');
@@ -9,9 +9,9 @@ const {
   patchEmpleados, patchCorrecciones, patchProductosEmpaque,
   patchCostosIngredientes, patchRecetasV2, patchDatosHistoricos,
   patchRolesEmpleados, patchUnidadesV2, patchLimpiezaDatosPrueba, patchTocinetaV3,
-  patchDatosHistoricosV2,
+  patchDatosHistoricosV2, patchDatosHistoricosV3, patchLimpiezaCompleta,
 } = require('../database/seed');
-const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters, abrirCajon } = require('./print-service');
+const { imprimirRecibo, imprimirCierre, imprimirPrueba, getPrinters, getPrintersDetailed, abrirCajon } = require('./print-service');
 const syncService = require('../sync/syncService');
 
 function hashPin(pin) {
@@ -36,7 +36,9 @@ function setupIpcHandlers() {
   patchUnidadesV2(db);
   patchLimpiezaDatosPrueba(db);
   patchTocinetaV3(db);
-  patchDatosHistoricosV2(db);
+  patchLimpiezaCompleta(db);   // limpieza total y reinserción desde CSV (antes de V2/V3)
+  patchDatosHistoricosV2(db);  // no-op después de patchLimpiezaCompleta
+  patchDatosHistoricosV3(db);  // no-op después de patchLimpiezaCompleta
 
   // Limpiar pedidos pendientes vacíos o corruptos al iniciar la app
   // Evita que mesas queden marcadas como "Abierta" sin tener ítems reales
@@ -673,8 +675,10 @@ function setupIpcHandlers() {
   ipcMain.handle('db:imprimirRecibo', (_, datos) => {
     const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
     const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
+    const cfgPuertoUsb = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_usb_win'").get();
     const printerName  = datos.printerName || cfgImpresora?.valor || null;
     const puertoLinux  = cfgPuerto?.valor || '/dev/usb/lp0';
+    const puertoUsb    = cfgPuertoUsb?.valor || 'USB001';
 
     const { ventaId, efectivo_recibido } = datos;
     const venta = db.prepare('SELECT * FROM ventas WHERE id=?').get(ventaId);
@@ -704,6 +708,7 @@ function setupIpcHandlers() {
       descuento_nombre:     venta.descuento_nombre || '',
       mesa_nombre:          venta.mesa_nombre || '',
       printerName,
+      puertoUsb,
       puertoLinux,
     });
   });
@@ -1056,22 +1061,26 @@ function setupIpcHandlers() {
     `).get(fecha);
     const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
     const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
+    const cfgPuertoUsb = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_usb_win'").get();
     return imprimirCierre({
       ...cajaDia,
       facturas:    ventas?.facturas || 0,
       f_inicio:    ventas?.f_inicio,
       f_fin:       ventas?.f_fin,
-      printerName: cfgImpresora?.valor || null,
-      puertoLinux: cfgPuerto?.valor    || '/dev/usb/lp0',
+      printerName: cfgImpresora?.valor   || null,
+      puertoUsb:   cfgPuertoUsb?.valor   || 'USB001',
+      puertoLinux: cfgPuerto?.valor      || '/dev/usb/lp0',
     });
   });
 
   ipcMain.handle('db:imprimirPrueba', (_, overrides = {}) => {
     const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
     const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
+    const cfgPuertoUsb = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_usb_win'").get();
     return imprimirPrueba({
-      printerName: overrides.printerName  ?? cfgImpresora?.valor ?? null,
-      puertoLinux: overrides.puertoLinux  ?? cfgPuerto?.valor    ?? '/dev/usb/lp0',
+      printerName: overrides.printerName ?? cfgImpresora?.valor ?? null,
+      puertoUsb:   overrides.puertoUsb   ?? cfgPuertoUsb?.valor ?? 'USB001',
+      puertoLinux: overrides.puertoLinux ?? cfgPuerto?.valor    ?? '/dev/usb/lp0',
     });
   });
 
@@ -1081,11 +1090,17 @@ function setupIpcHandlers() {
     const cfgPin       = db.prepare("SELECT valor FROM configuracion WHERE clave='cajon_pin'").get();
     const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
     const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
+    const cfgPuertoUsb = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_usb_win'").get();
     return abrirCajon({
-      pin:         cfgPin?.valor        || '2',
-      printerName: cfgImpresora?.valor  || null,
-      puertoLinux: cfgPuerto?.valor     || '/dev/usb/lp0',
+      pin:         cfgPin?.valor       || '2',
+      printerName: cfgImpresora?.valor || null,
+      puertoUsb:   cfgPuertoUsb?.valor || 'USB001',
+      puertoLinux: cfgPuerto?.valor    || '/dev/usb/lp0',
     });
+  });
+
+  ipcMain.handle('db:getPrintersDetailed', () => {
+    try { return getPrintersDetailed(); } catch(_) { return []; }
   });
 
   ipcMain.handle('db:getVentasDomicilios', (_, { fechaInicio, fechaFin }) => {
@@ -1476,6 +1491,286 @@ function setupIpcHandlers() {
     `).get(inicio, fin);
 
     return { externos, porPlataforma, propios };
+  });
+
+  // ── EXPORTACIÓN A EXCEL ───────────────────────────────────────────────────
+
+  // Formato monetario colombiano: 155000 → "$155.500"
+  function fmtCO(n) {
+    const num = Math.round(n || 0);
+    return '$' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  // Fecha DD/MM/YYYY
+  function fmtFecha(s) {
+    if (!s) return '';
+    const d = new Date(s.length === 10 ? s + 'T12:00:00' : s);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+
+  // Crea un .xlsx en ~/Documentos/PerrosAmericanos/ y devuelve la ruta.
+  // hojas: [{ nombre, datos, columnas, anchosFijos? }]
+  function crearExcel(hojas, nombreArchivo) {
+    const XLSX   = require('xlsx');
+    const path   = require('path');
+    const fs     = require('fs');
+    const carpeta = path.join(app.getPath('documents'), 'PerrosAmericanos');
+    if (!fs.existsSync(carpeta)) fs.mkdirSync(carpeta, { recursive: true });
+    const ruta = path.join(carpeta, nombreArchivo);
+    const wb   = XLSX.utils.book_new();
+    for (const { nombre, datos, columnas, anchosFijos } of hojas) {
+      const ws = XLSX.utils.json_to_sheet(datos, { header: columnas });
+      ws['!cols'] = columnas.map((col, i) => ({
+        wch: anchosFijos?.[i] ?? Math.max(String(col).length + 2, 14),
+      }));
+      XLSX.utils.book_append_sheet(wb, ws, nombre);
+    }
+    XLSX.writeFile(wb, ruta);
+    return ruta;
+  }
+
+  // ── Exportar Rentabilidad ─────────────────────────────────────────────────
+  ipcMain.handle('db:exportarRentabilidad', () => {
+    try {
+      const productos = db.prepare('SELECT * FROM productos WHERE activo=1 ORDER BY categoria, nombre').all();
+      const filas = [];
+      let sumUnidades = 0, sumUtilidad = 0;
+
+      for (const prod of productos) {
+        const receta = db.prepare(`
+          SELECT r.cantidad, i.costo_unitario
+          FROM recetas r JOIN ingredientes i ON i.id=r.ingrediente_id
+          WHERE r.producto_id=?
+        `).all(prod.id);
+
+        let costo = 0, costoCompleto = receta.length > 0;
+        for (const r of receta) {
+          if (!r.costo_unitario) costoCompleto = false;
+          costo += r.cantidad * (r.costo_unitario || 0);
+        }
+        costo = Math.round(costo);
+
+        const vv = db.prepare(`
+          SELECT COALESCE(SUM(dv.cantidad),0) as unidades
+          FROM detalle_ventas dv JOIN ventas v ON v.id=dv.venta_id
+          WHERE dv.producto_id=?
+        `).get(prod.id);
+
+        const margenMonto = prod.precio - costo;
+        const margenPct   = prod.precio > 0
+          ? Math.round((margenMonto / prod.precio) * 1000) / 10 : 0;
+        const utilTotal   = Math.round(margenMonto * vv.unidades);
+
+        const estado = !costoCompleto ? 'Sin datos'
+          : margenPct >= 50 ? 'Bueno'
+          : margenPct >= 30 ? 'Regular'
+          : margenPct >= 0  ? 'Bajo'
+          : 'Negativo';
+
+        filas.push({
+          'Código':               prod.codigo || '',
+          'Producto':             prod.nombre,
+          'Precio venta ($)':     fmtCO(prod.precio),
+          'Costo ingredientes ($)': costoCompleto ? fmtCO(costo)      : 'Sin datos',
+          'Utilidad x unidad ($)':  costoCompleto ? fmtCO(margenMonto): 'Sin datos',
+          'Margen %':               costoCompleto ? `${margenPct}%`    : 'Sin datos',
+          'Unidades vendidas':      vv.unidades,
+          'Utilidad total ($)':     costoCompleto ? fmtCO(utilTotal)   : 'Sin datos',
+          'Estado':                 estado,
+        });
+        sumUnidades  += vv.unidades;
+        if (costoCompleto) sumUtilidad += utilTotal;
+      }
+
+      filas.push({
+        'Código': '', 'Producto': 'TOTALES',
+        'Precio venta ($)': '', 'Costo ingredientes ($)': '',
+        'Utilidad x unidad ($)': '', 'Margen %': '',
+        'Unidades vendidas': sumUnidades,
+        'Utilidad total ($)': fmtCO(sumUtilidad),
+        'Estado': '',
+      });
+
+      const columnas = [
+        'Código','Producto','Precio venta ($)','Costo ingredientes ($)',
+        'Utilidad x unidad ($)','Margen %','Unidades vendidas',
+        'Utilidad total ($)','Estado',
+      ];
+      const hoyTag = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const ruta = crearExcel([{ nombre: 'Rentabilidad', datos: filas, columnas }],
+        `Rentabilidad_${hoyTag}.xlsx`);
+      return { ok: true, path: ruta };
+    } catch (err) {
+      console.error('[Excel] exportarRentabilidad:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // ── Exportar Cierres de Caja ──────────────────────────────────────────────
+  ipcMain.handle('db:exportarCierresCaja', () => {
+    try {
+      const cierres = db.prepare(
+        'SELECT * FROM caja WHERE cerrada=1 ORDER BY fecha DESC LIMIT 90'
+      ).all();
+      const filas = [];
+      let sumVentas = 0, sumEf = 0, sumNq = 0, sumGastos = 0, sumUtil = 0;
+
+      for (const c of cierres) {
+        const ini = `${c.fecha} 00:00:00`, fin = `${c.fecha} 23:59:59`;
+
+        const vEf = db.prepare(`
+          SELECT COALESCE(
+            SUM(CASE WHEN metodo_pago='efectivo' THEN total ELSE 0 END)+
+            SUM(CASE WHEN metodo_pago='mixto' THEN monto_efectivo_mixto ELSE 0 END),0) as v
+          FROM ventas WHERE fecha BETWEEN ? AND ?
+        `).get(ini, fin).v;
+
+        const vNq = db.prepare(`
+          SELECT COALESCE(
+            SUM(CASE WHEN metodo_pago='nequi' THEN total ELSE 0 END)+
+            SUM(CASE WHEN metodo_pago='mixto' THEN monto_nequi_mixto ELSE 0 END),0) as v
+          FROM ventas WHERE fecha BETWEEN ? AND ?
+        `).get(ini, fin).v;
+
+        const gEf = db.prepare(`
+          SELECT COALESCE(
+            SUM(CASE WHEN metodo_pago='efectivo' THEN monto ELSE 0 END)+
+            SUM(CASE WHEN metodo_pago='mixto' THEN COALESCE(monto_efectivo_mixto,0) ELSE 0 END),0) as v
+          FROM gastos WHERE fecha BETWEEN ? AND ?
+        `).get(ini, fin).v;
+
+        const gNq = db.prepare(`
+          SELECT COALESCE(
+            SUM(CASE WHEN metodo_pago='nequi' THEN monto ELSE 0 END)+
+            SUM(CASE WHEN metodo_pago='mixto' THEN COALESCE(monto_nequi_mixto,0) ELSE 0 END),0) as v
+          FROM gastos WHERE fecha BETWEEN ? AND ?
+        `).get(ini, fin).v;
+
+        const facts = db.prepare(`
+          SELECT COUNT(*) as total,
+                 MIN(CASE WHEN factura_num>0 THEN factura_num END) as fi,
+                 MAX(factura_num) as ff
+          FROM ventas WHERE DATE(fecha)=?
+        `).get(c.fecha);
+        const factRango = facts.total > 0 && facts.fi
+          ? `${facts.fi} - ${facts.ff}` : facts.total > 0 ? `${facts.total} ventas` : '—';
+
+        filas.push({
+          'Fecha':               fmtFecha(c.fecha),
+          'Empleado':            c.empleado || '',
+          'Total ventas ($)':    fmtCO(c.total_ventas),
+          'Ventas efectivo ($)': fmtCO(vEf),
+          'Ventas Nequi ($)':    fmtCO(vNq),
+          'Total gastos ($)':    fmtCO(c.gastos),
+          'Gastos efectivo ($)': fmtCO(gEf),
+          'Gastos Nequi ($)':    fmtCO(gNq),
+          'Utilidad neta ($)':   fmtCO(c.utilidad),
+          'Descuadre ($)':       c.descuadre === 0 ? '$0' : fmtCO(c.descuadre),
+          'Facturas':            factRango,
+          'Observaciones':       c.observacion_descuadre || c.notas || '',
+        });
+        sumVentas += c.total_ventas || 0;
+        sumEf     += vEf;
+        sumNq     += vNq;
+        sumGastos += c.gastos || 0;
+        sumUtil   += c.utilidad || 0;
+      }
+
+      filas.push({
+        'Fecha': 'TOTALES', 'Empleado': '',
+        'Total ventas ($)':    fmtCO(sumVentas),
+        'Ventas efectivo ($)': fmtCO(sumEf),
+        'Ventas Nequi ($)':    fmtCO(sumNq),
+        'Total gastos ($)':    fmtCO(sumGastos),
+        'Gastos efectivo ($)': '', 'Gastos Nequi ($)': '',
+        'Utilidad neta ($)':   fmtCO(sumUtil),
+        'Descuadre ($)': '', 'Facturas': '', 'Observaciones': '',
+      });
+
+      const columnas = [
+        'Fecha','Empleado','Total ventas ($)','Ventas efectivo ($)',
+        'Ventas Nequi ($)','Total gastos ($)','Gastos efectivo ($)',
+        'Gastos Nequi ($)','Utilidad neta ($)','Descuadre ($)',
+        'Facturas','Observaciones',
+      ];
+      const hoyTag = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const ruta = crearExcel([{ nombre: 'Cierres', datos: filas, columnas }],
+        `Cierres_Caja_${hoyTag}.xlsx`);
+      return { ok: true, path: ruta };
+    } catch (err) {
+      console.error('[Excel] exportarCierresCaja:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // ── Exportar Inventario (dos hojas) ──────────────────────────────────────
+  ipcMain.handle('db:exportarInventario', () => {
+    try {
+      // Hoja 1: Estado actual de ingredientes
+      const ingredientes = db.prepare(`
+        SELECT i.*, COALESCE(p.nombre,'—') as proveedor_nombre
+        FROM ingredientes i LEFT JOIN proveedores p ON p.id=i.proveedor_id
+        WHERE i.activo=1 ORDER BY i.categoria, i.nombre
+      `).all();
+
+      const estadoIng = (i) => {
+        if (i.stock_actual === 0)                                              return 'Sin stock';
+        if (i.stock_minimo > 0 && i.stock_actual <= i.stock_minimo)           return 'Urgente';
+        if (i.stock_minimo > 0 && i.stock_actual <= i.stock_minimo * 1.5)     return 'Riesgo';
+        return 'OK';
+      };
+
+      const hoja1 = ingredientes.map(i => ({
+        'Ingrediente':         i.nombre,
+        'Categoría':           i.categoria,
+        'Stock actual':        i.stock_actual,
+        'Unidad':              i.unidad,
+        'Stock mínimo':        i.stock_minimo,
+        'Estado':              estadoIng(i),
+        'Costo unitario ($)':  fmtCO(i.costo_unitario),
+        'Valor en stock ($)':  fmtCO((i.stock_actual || 0) * (i.costo_unitario || 0)),
+        'Proveedor':           i.proveedor_nombre,
+      }));
+
+      // Hoja 2: Bajas registradas
+      const bajas = db.prepare(`
+        SELECT b.fecha, b.ingrediente_nombre, b.cantidad, b.motivo, b.empleado,
+               COALESCE(i.costo_unitario, 0) as cu
+        FROM bajas b LEFT JOIN ingredientes i ON i.id=b.ingrediente_id
+        ORDER BY b.fecha DESC LIMIT 300
+      `).all();
+
+      const hoja2 = bajas.map(b => ({
+        'Fecha':               fmtFecha(b.fecha),
+        'Ingrediente':         b.ingrediente_nombre,
+        'Cantidad':            b.cantidad,
+        'Motivo':              b.motivo || '',
+        'Empleado':            b.empleado || '',
+        'Costo estimado ($)':  fmtCO(b.cantidad * b.cu),
+      }));
+
+      const cols1 = [
+        'Ingrediente','Categoría','Stock actual','Unidad','Stock mínimo',
+        'Estado','Costo unitario ($)','Valor en stock ($)','Proveedor',
+      ];
+      const cols2 = ['Fecha','Ingrediente','Cantidad','Motivo','Empleado','Costo estimado ($)'];
+
+      const hoyTag = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const ruta = crearExcel([
+        { nombre: 'Estado actual', datos: hoja1, columnas: cols1 },
+        { nombre: 'Bajas',         datos: hoja2, columnas: cols2 },
+      ], `Inventario_${hoyTag}.xlsx`);
+      return { ok: true, path: ruta };
+    } catch (err) {
+      console.error('[Excel] exportarInventario:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // ── Abrir archivo en el explorador del SO ────────────────────────────────
+  ipcMain.handle('app:abrirArchivo', (_, ruta) => {
+    shell.openPath(ruta);
+    return { ok: true };
   });
 }
 

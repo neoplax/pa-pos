@@ -20,10 +20,12 @@ function SemaforoCirculo({ pct, gris = false }) {
 }
 
 export default function Rentabilidad() {
-  const [productos, setProductos] = useState([]);
-  const [cargando, setCargando]   = useState(true);
-  const [filtro, setFiltro]       = useState('todos');
-  const [ordenar, setOrdenar]     = useState('utilidad_total');
+  const [productos, setProductos]     = useState([]);
+  const [cargando, setCargando]       = useState(true);
+  const [filtro, setFiltro]           = useState('todos');
+  const [ordenar, setOrdenar]         = useState('utilidad_total');
+  const [exportando, setExportando]   = useState(false);
+  const [exportResult, setExportResult] = useState(null); // { path } | null
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -38,6 +40,16 @@ export default function Rentabilidad() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const exportarExcel = async () => {
+    setExportando(true);
+    setExportResult(null);
+    try {
+      const res = await window.electronAPI.exportarRentabilidad();
+      if (res?.ok) setExportResult({ path: res.path });
+    } catch (_) {}
+    finally { setExportando(false); }
+  };
 
   const filtrados = productos
     .filter(p => filtro === 'todos' || p.categoria === filtro)
@@ -173,6 +185,21 @@ export default function Rentabilidad() {
           </select>
         </div>
         <button className="btn btn-secundario" onClick={cargar}>🔄 Recalcular</button>
+        <button className="btn btn-secundario" onClick={exportarExcel} disabled={exportando}>
+          {exportando ? 'Exportando...' : '📊 Exportar Excel'}
+        </button>
+        {exportResult && (
+          <span style={{ fontSize: 13, color: 'var(--verde)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ✅ Excel guardado
+            <button
+              className="btn btn-secundario"
+              style={{ fontSize: 12, padding: '2px 10px' }}
+              onClick={() => window.electronAPI.abrirArchivoExcel(exportResult.path)}
+            >
+              Abrir archivo
+            </button>
+          </span>
+        )}
       </div>
 
       {/* Tabla */}

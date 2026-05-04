@@ -95,6 +95,8 @@ function waUrl(telefono, texto) {
 
 export default function Inventario() {
   const { empleado, notificar } = useApp();
+  const [exportando, setExportando]   = useState(false);
+  const [exportPath, setExportPath]   = useState(null);
 
   // Datos
   const [ingredientes,  setIngredientes]  = useState([]);
@@ -206,6 +208,34 @@ export default function Inventario() {
             🍳 Preparación batch
           </button>
           <button className="btn btn-secundario" onClick={cargar}>🔄 Actualizar</button>
+          <button
+            className="btn btn-secundario"
+            disabled={exportando}
+            onClick={async () => {
+              setExportando(true); setExportPath(null);
+              try {
+                const res = await window.electronAPI.exportarInventario();
+                if (res?.ok) {
+                  setExportPath(res.path);
+                  notificar('Excel guardado en Documentos/PerrosAmericanos/', 'exito');
+                } else {
+                  notificar('Error al exportar: ' + (res?.error || ''), 'error');
+                }
+              } catch (e) { notificar('Error al exportar', 'error'); }
+              finally { setExportando(false); }
+            }}
+          >
+            {exportando ? 'Exportando...' : '📊 Exportar inventario'}
+          </button>
+          {exportPath && (
+            <button
+              className="btn btn-secundario"
+              style={{ fontSize: 12 }}
+              onClick={() => window.electronAPI.abrirArchivoExcel(exportPath)}
+            >
+              Abrir archivo
+            </button>
+          )}
         </div>
       </div>
 

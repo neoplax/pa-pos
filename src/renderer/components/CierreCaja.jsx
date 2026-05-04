@@ -19,6 +19,8 @@ export default function CierreCaja() {
   const [notas, setNotas]                             = useState('');
   const [obsDescuadre, setObsDescuadre]               = useState('');
   const [imprimiendo, setImprimiendo]                 = useState(false);
+  const [exportando, setExportando]                   = useState(false);
+  const [exportPath, setExportPath]                   = useState(null);
 
   const hoy = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().split('T')[0];
 
@@ -393,7 +395,43 @@ export default function CierreCaja() {
 
       {/* Historial */}
       <div className="card">
-        <div className="card-titulo">📅 Historial de cierres (últimos 30 días)</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div className="card-titulo" style={{ marginBottom: 0 }}>📅 Historial de cierres (últimos 30 días)</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {exportPath && (
+              <span style={{ fontSize: 12, color: 'var(--verde)' }}>
+                ✅ Guardado
+                <button
+                  className="btn btn-secundario"
+                  style={{ fontSize: 12, padding: '2px 8px', marginLeft: 6 }}
+                  onClick={() => window.electronAPI.abrirArchivoExcel(exportPath)}
+                >
+                  Abrir
+                </button>
+              </span>
+            )}
+            <button
+              className="btn btn-secundario"
+              style={{ fontSize: 13 }}
+              disabled={exportando || historial.length === 0}
+              onClick={async () => {
+                setExportando(true); setExportPath(null);
+                try {
+                  const res = await window.electronAPI.exportarCierresCaja();
+                  if (res?.ok) {
+                    setExportPath(res.path);
+                    notificar('Excel guardado en Documentos/PerrosAmericanos/', 'exito');
+                  } else {
+                    notificar('Error al exportar: ' + (res?.error || ''), 'error');
+                  }
+                } catch (e) { notificar('Error al exportar', 'error'); }
+                finally { setExportando(false); }
+              }}
+            >
+              {exportando ? 'Exportando...' : '📊 Exportar historial'}
+            </button>
+          </div>
+        </div>
         {historial.length === 0 ? (
           <div className="vacio">Sin cierres registrados aún</div>
         ) : (

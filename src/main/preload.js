@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   asignarFactura:       (ventaId, facturaNum, efectivoRecibido)     => ipcRenderer.invoke('db:asignarFactura', ventaId, facturaNum, efectivoRecibido),
   getUltimaVenta:       ()                                          => ipcRenderer.invoke('db:getUltimaVenta'),
   getPrinters:          ()                                          => ipcRenderer.invoke('db:getPrinters'),
+  getPrintersDetailed:  ()                                          => ipcRenderer.invoke('db:getPrintersDetailed'),
 
   // ── Descuentos ─────────────────────────────────────────────────────────────
   getDescuentos:         ()          => ipcRenderer.invoke('db:getDescuentos'),
@@ -138,6 +139,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Suscribirse a cambios de estado enviados desde el proceso principal
   sync_onEstadoCambiado:  (cb)   => ipcRenderer.on('sync:estadoCambiado', (_e, est) => cb(est)),
   sync_offEstadoCambiado: ()     => ipcRenderer.removeAllListeners('sync:estadoCambiado'),
+
+  // ── Exportación Excel ──────────────────────────────────────────────────────
+  exportarRentabilidad: () => ipcRenderer.invoke('db:exportarRentabilidad'),
+  exportarCierresCaja:  () => ipcRenderer.invoke('db:exportarCierresCaja'),
+  exportarInventario:   () => ipcRenderer.invoke('db:exportarInventario'),
+  abrirArchivoExcel:    (ruta) => ipcRenderer.invoke('app:abrirArchivo', ruta),
 
   // ── App ────────────────────────────────────────────────────────────────────
   reiniciarApp:  () => ipcRenderer.invoke('app:reiniciar'),

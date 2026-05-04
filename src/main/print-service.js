@@ -232,7 +232,7 @@ function _guardarTxt(texto, subtipo = 'recibo', fechaStr = null) {
   return archivo;
 }
 
-// ── Listar impresoras del sistema ─────────────────────────────────────────────
+// ── Listar impresoras del sistema (solo nombres) ──────────────────────────────
 function getPrinters() {
   try {
     if (process.platform === 'win32') {
@@ -249,6 +249,30 @@ function getPrinters() {
       if (nombres.length > 0) return nombres;
     } catch (_) {}
     return [];
+  } catch (_) {
+    return [];
+  }
+}
+
+// ── Listar impresoras con nombre Y puerto (Windows) ───────────────────────────
+// Devuelve [{ name, port }] — permite al usuario seleccionar name+port a la vez.
+function getPrintersDetailed() {
+  try {
+    if (process.platform !== 'win32') return [];
+    const raw = execSync('wmic printer get Name,PortName /format:csv', {
+      encoding: 'utf8', shell: 'cmd.exe', timeout: 5000,
+    });
+    // Formato CSV: Node,Name,PortName
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    const hi = lines.findIndex(l => /node,name,portname/i.test(l));
+    if (hi === -1) return [];
+    return lines.slice(hi + 1).map(l => {
+      const parts = l.split(',');
+      if (parts.length < 3) return null;
+      const name = parts[parts.length - 2]?.trim();
+      const port = parts[parts.length - 1]?.trim();
+      return (name && name !== 'Name' && port) ? { name, port } : null;
+    }).filter(Boolean);
   } catch (_) {
     return [];
   }
@@ -319,22 +343,45 @@ function _execAsync(cmd, opts = {}) {
   });
 }
 
-// ── Impresión en Windows — node-thermal-printer primario, copy /b de respaldo ──
-async function printWindows(buffer, texto, printerName) {
+// ── Impresión en Windows — cascada: USB port → share → node-thermal-printer → txt
+async function printWindows(buffer, texto, printerName, puertoUsb) {
   const tmpDir = path.join(os.tmpdir(), 'perros-pos');
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
   const tmpBin = path.join(tmpDir, 'recibo.bin');
   fs.writeFileSync(tmpBin, buffer);
 
-  _guardarTxt(texto);
+  const nombre = printerName || 'PrinterPOS-80';
+  const puerto = puertoUsb   || 'USB001';
+  _logWin(`Impresora: ${nombre} | Puerto USB: ${puerto}`);
 
-  const nombre = printerName || 'POS-80C';
-  _logWin(`Impresora seleccionada: ${nombre}`);
+  // ── Intento 1: copy /b directo al puerto USB ─────────────────────────────────
+  const cmd1 = `copy /b "${tmpBin}" ${puerto}`;
+  try {
+    _logWin(`Intento 1 (copy /b ${puerto}): ${cmd1}`);
+    await _execAsync(cmd1);
+    _logWin('Resultado: OK (copy_usb_port)');
+    _guardarTxt(texto);
+    return { ok: true, metodo: 'copy_usb_port' };
+  } catch (e1) {
+    _logWin(`Intento 1 falló: ${e1.message}`);
+  }
 
-  // ── Intento 1: node-thermal-printer (driver nativo Windows) ─────────────────
+  // ── Intento 2: copy /b al share local ────────────────────────────────────────
+  const cmd2 = `copy /b "${tmpBin}" "\\\\%COMPUTERNAME%\\${nombre}"`;
+  try {
+    _logWin(`Intento 2 (copy /b share): ${cmd2}`);
+    await _execAsync(cmd2);
+    _logWin('Resultado: OK (copy_share)');
+    _guardarTxt(texto);
+    return { ok: true, metodo: 'copy_share' };
+  } catch (e2) {
+    _logWin(`Intento 2 falló: ${e2.message}`);
+  }
+
+  // ── Intento 3: node-thermal-printer ──────────────────────────────────────────
   try {
     const { printer: ThermalPrinter, types: PrinterTypes } = require('node-thermal-printer');
-    _logWin(`Intento 1 (node-thermal-printer) → printer:${nombre}`);
+    _logWin(`Intento 3 (node-thermal-printer) → printer:${nombre}`);
     const tp = new ThermalPrinter({
       type:                    PrinterTypes.EPSON,
       interface:               `printer:${nombre}`,
@@ -345,58 +392,39 @@ async function printWindows(buffer, texto, printerName) {
       await tp.raw(buffer);
       await tp.execute();
       _logWin('Resultado: OK (node_thermal_printer)');
+      _guardarTxt(texto);
       return { ok: true, metodo: 'node_thermal_printer' };
     }
     _logWin('node-thermal-printer: impresora no conectada');
-  } catch (e1) {
-    _logWin(`Intento 1 falló: ${e1.message}`);
+  } catch (e3) {
+    _logWin(`Intento 3 falló: ${e3.message}`);
   }
 
-  // ── Intento 2: copy /b — share local, luego puerto USB vía WMIC ─────────────
-  const cmd2a = `copy /b "${tmpBin}" "\\\\%COMPUTERNAME%\\${nombre}"`;
-  try {
-    _logWin(`Intento 2a (copy /b share): ${cmd2a}`);
-    await _execAsync(cmd2a);
-    _logWin('Resultado: OK (copy_share)');
-    return { ok: true, metodo: 'copy_share' };
-  } catch (e2a) {
-    _logWin(`Intento 2a falló: ${e2a.message}`);
-  }
-
-  try {
-    const wmicOut = execSync(
-      `wmic printer where "Name='${nombre.replace(/'/g, "\\'")}'" get PortName /format:value`,
-      { encoding: 'utf8', shell: 'cmd.exe', timeout: 5000 }
-    );
-    const port = wmicOut.match(/PortName=([^\r\n]+)/)?.[1]?.trim() || null;
-    if (port) {
-      _logWin(`Puerto detectado via WMIC: ${port}`);
-      const cmd2b = `copy /b "${tmpBin}" "${port}"`;
-      try {
-        _logWin(`Intento 2b (copy /b ${port}): ${cmd2b}`);
-        await _execAsync(cmd2b);
-        _logWin('Resultado: OK (copy_port)');
-        return { ok: true, metodo: 'copy_port' };
-      } catch (e2b) {
-        _logWin(`Intento 2b falló: ${e2b.message}`);
-      }
-    } else {
-      _logWin('WMIC no devolvió puerto para esta impresora');
-    }
-  } catch (eWmic) {
-    _logWin(`WMIC falló: ${eWmic.message}`);
-  }
-
+  // ── Intento 4: respaldo .txt ──────────────────────────────────────────────────
   _logWin('Todos los intentos fallaron — respaldo .txt guardado');
-  return { ok: true, metodo: 'txt_backup', aviso: 'impresora_no_disponible' };
+  const archivo = _guardarTxt(texto);
+  return { ok: true, metodo: 'txt_backup', path: archivo, aviso: 'impresora_no_disponible' };
 }
 
 // ── Apertura de cajón portamonedas (ESC/POS) ─────────────────────────────────
-async function abrirCajon({ pin = '2', printerName, puertoLinux } = {}) {
+async function abrirCajon({ pin = '2', printerName, puertoUsb, puertoLinux } = {}) {
   const cmd = pin === '5' ? CMD_CAJON_PIN5 : CMD_CAJON_PIN2;
   try {
     if (process.platform === 'win32') {
-      const nombre = printerName || 'POS-80C';
+      const nombre = printerName || 'PrinterPOS-80';
+      const puerto = puertoUsb   || 'USB001';
+
+      // Intento 1: copy /b al puerto USB
+      const tmpDir = path.join(os.tmpdir(), 'perros-pos');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const tmpBin = path.join(tmpDir, 'cajon.bin');
+      fs.writeFileSync(tmpBin, cmd);
+      try {
+        execSync(`copy /b "${tmpBin}" ${puerto}`, { shell: 'cmd.exe', timeout: 5000 });
+        return { ok: true };
+      } catch (_) {}
+
+      // Intento 2: node-thermal-printer
       try {
         const { printer: ThermalPrinter, types: PrinterTypes } = require('node-thermal-printer');
         const tp = new ThermalPrinter({
@@ -431,7 +459,7 @@ async function imprimirRecibo(datos) {
     const buffer = construirBuffer(_partesRecibo(datos));
     const texto  = generarTextoRecibo(datos);
     if (process.platform === 'win32') {
-      return await printWindows(buffer, texto, datos.printerName);
+      return await printWindows(buffer, texto, datos.printerName, datos.puertoUsb);
     }
     return printLinux(buffer, texto, datos.puertoLinux);
   } catch (err) {
@@ -445,14 +473,10 @@ async function imprimirCierre(datos) {
   try {
     const buffer = construirBuffer(_partesCierre(datos));
     const texto  = generarTextoCierre(datos);
-    if (process.platform === 'win32') {
-      // _guardarTxt lo llama printWindows internamente con subtipo 'recibo';
-      // para el cierre guardamos también copia en /cierres/
-      _guardarTxt(texto, 'cierre', datos.fecha);
-      return await printWindows(buffer, texto, datos.printerName);
-    }
-    // En Linux: guardar copia del cierre antes de imprimir
     _guardarTxt(texto, 'cierre', datos.fecha);
+    if (process.platform === 'win32') {
+      return await printWindows(buffer, texto, datos.printerName, datos.puertoUsb);
+    }
     return printLinux(buffer, texto, datos.puertoLinux);
   } catch (err) {
     console.error('[Print] Error imprimirCierre:', err);
@@ -461,13 +485,13 @@ async function imprimirCierre(datos) {
 }
 
 // ── Punto de entrada: imprimir recibo de prueba ───────────────────────────────
-async function imprimirPrueba({ printerName, puertoLinux } = {}) {
+async function imprimirPrueba({ printerName, puertoUsb, puertoLinux } = {}) {
   try {
     const partes = _partesPrueba();
     const buffer = construirBuffer(partes);
     const texto  = partes.map(p => p.texto).join('\n') + '\n';
     if (process.platform === 'win32') {
-      return await printWindows(buffer, texto, printerName);
+      return await printWindows(buffer, texto, printerName, puertoUsb);
     }
     return printLinux(buffer, texto, puertoLinux);
   } catch (err) {
@@ -479,5 +503,5 @@ async function imprimirPrueba({ printerName, puertoLinux } = {}) {
 module.exports = {
   imprimirRecibo, generarTextoRecibo,
   imprimirCierre, generarTextoCierre,
-  imprimirPrueba, getPrinters, abrirCajon,
+  imprimirPrueba, getPrinters, getPrintersDetailed, abrirCajon,
 };
