@@ -266,25 +266,35 @@ async function subirAhora() {
 }
 
 // ── Forzar bajada ─────────────────────────────────────────────────────────────
-// Descarga a un archivo .new y reinicia la app para que SQLite cargue la nueva DB.
-// No se puede sobrescribir la DB mientras better-sqlite3 la tiene abierta en Windows.
+// Descarga a archivo temporal y reemplaza la DB local.
+// En Windows usa copy+unlink en lugar de rename para evitar EBUSY cuando
+// better-sqlite3 mantiene un handle abierto sobre el archivo original.
 async function bajarAhora() {
   if (!drive.estaConfigurado()) return { ok: false, msg: 'Sin cuenta configurada' };
 
   log('Bajada forzada...');
   actualizarEstado({ estado: 'sincronizando', errorMsg: null });
   try {
-    const ruta    = rutaDB();
-    const tmpRuta = ruta + '.downloading';
+    const ruta        = rutaDB();
+    const tmpDescarga = ruta + '.descarga';
+    const tmpBackup   = ruta + '.bak';
 
-    await drive.bajarDB(tmpRuta);
+    await drive.bajarDB(tmpDescarga);
 
-    // Reemplazar DB local con la descargada
-    // (el archivo .downloading se convierte en el nuevo .db antes de reiniciar)
-    if (fs.existsSync(ruta)) {
-      fs.renameSync(ruta, ruta + '.bak');
+    if (process.platform === 'win32') {
+      // Windows: copy + unlink evita EBUSY al intentar rename sobre archivo con handle abierto
+      if (fs.existsSync(ruta)) {
+        fs.copyFileSync(ruta, tmpBackup);
+        fs.unlinkSync(ruta);
+      }
+      fs.copyFileSync(tmpDescarga, ruta);
+      fs.unlinkSync(tmpDescarga);
+    } else {
+      if (fs.existsSync(ruta)) {
+        fs.renameSync(ruta, tmpBackup);
+      }
+      fs.renameSync(tmpDescarga, ruta);
     }
-    fs.renameSync(tmpRuta, ruta);
 
     actualizarEstado({ ultimaSync: new Date().toISOString(), estado: 'sincronizado', errorMsg: null });
     log('Bajada forzada completada — se requiere reinicio para cargar la nueva DB');
@@ -292,7 +302,7 @@ async function bajarAhora() {
     return { ok: true, accion: 'descarga', requiereReinicio: true };
   } catch (err) {
     // Limpiar archivo temporal si quedó a medias
-    try { fs.unlinkSync(rutaDB() + '.downloading'); } catch (_) {}
+    try { fs.unlinkSync(rutaDB() + '.descarga'); } catch (_) {}
     log(`Error en bajada forzada: ${err.message}`);
     actualizarEstado({ estado: 'error', errorMsg: err.message });
     return { ok: false, msg: err.message };

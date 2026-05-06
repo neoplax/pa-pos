@@ -77,11 +77,11 @@ export default function Rentabilidad() {
     : null;
   const negativos   = conDatos.filter(p => p.margen_pct < 0);
 
-  if (cargando) return <div className="cargando">⏳ Calculando rentabilidad...</div>;
+  if (cargando) return <div className="cargando">Calculando rentabilidad...</div>;
 
   return (
     <div>
-      <div className="pagina-titulo">📉 Rentabilidad</div>
+      <div className="pagina-titulo">Rentabilidad</div>
 
       {/* Alerta margen negativo */}
       {negativos.length > 0 && (
@@ -89,7 +89,7 @@ export default function Rentabilidad() {
           background: 'rgba(231,76,60,0.12)', border: '1px solid rgba(231,76,60,0.4)',
           padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 14,
         }}>
-          🚨 <strong>{negativos.length} producto{negativos.length > 1 ? 's' : ''} con margen negativo:</strong>{' '}
+          <strong>{negativos.length} producto{negativos.length > 1 ? 's' : ''} con margen negativo:</strong>{' '}
           {negativos.map(p => p.nombre).join(', ')}
         </div>
       )}
@@ -97,22 +97,18 @@ export default function Rentabilidad() {
       {/* Stats semáforo */}
       <div className="stats-grid mb-24">
         <div className="stat-card verde">
-          <span className="stat-icono">✅</span>
           <span className="stat-label">Margen &gt; 50%</span>
           <span className="stat-valor">{verdes} prod.</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--amarillo)' }}>
-          <span className="stat-icono">⚠️</span>
           <span className="stat-label">Margen 30–50%</span>
           <span className="stat-valor">{amarillos} prod.</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">🔴</span>
           <span className="stat-label">Margen &lt; 30%</span>
           <span className="stat-valor">{rojos} prod.</span>
         </div>
         <div className="stat-card azul">
-          <span className="stat-icono">📊</span>
           <span className="stat-label">Margen promedio</span>
           <span className="stat-valor">{promMargen}%</span>
         </div>
@@ -123,7 +119,7 @@ export default function Rentabilidad() {
         <div className="card mb-24" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {estrella && estrella.utilidad_total > 0 && (
             <div style={{ flex: 1, minWidth: 160 }}>
-              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>⭐ Producto estrella</div>
+              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>Producto estrella</div>
               <div style={{ fontWeight: 700 }}>{estrella.nombre}</div>
               <div style={{ color: 'var(--verde)', fontSize: 13 }}>
                 Utilidad total: ${estrella.utilidad_total.toLocaleString('es-CO')}
@@ -132,7 +128,7 @@ export default function Rentabilidad() {
           )}
           {masVendido && masVendido.unidades > 0 && (
             <div style={{ flex: 1, minWidth: 160, borderLeft: '1px solid var(--borde)', paddingLeft: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>🏆 Más vendido</div>
+              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>Más vendido</div>
               <div style={{ fontWeight: 700 }}>{masVendido.nombre}</div>
               <div style={{ color: 'var(--naranja)', fontSize: 13 }}>
                 {masVendido.unidades} unidades vendidas
@@ -141,7 +137,7 @@ export default function Rentabilidad() {
           )}
           {critico && (
             <div style={{ flex: 1, minWidth: 160, borderLeft: '1px solid var(--borde)', paddingLeft: 16 }}>
-              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>🔴 Margen más bajo</div>
+              <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>Margen más bajo</div>
               <div style={{ fontWeight: 700 }}>{critico.nombre}</div>
               <div style={{ color: 'var(--rojo)', fontSize: 13 }}>
                 Margen: {Math.round(critico.margen_pct)}%
@@ -184,9 +180,9 @@ export default function Rentabilidad() {
             <option value="precio">Ordenar por precio</option>
           </select>
         </div>
-        <button className="btn btn-secundario" onClick={cargar}>🔄 Recalcular</button>
+        <button className="btn btn-secundario" onClick={cargar}>Recalcular</button>
         <button className="btn btn-secundario" onClick={exportarExcel} disabled={exportando}>
-          {exportando ? 'Exportando...' : '📊 Exportar Excel'}
+          {exportando ? 'Exportando...' : 'Exportar Excel'}
         </button>
         {exportResult && (
           <span style={{ fontSize: 13, color: 'var(--verde)', display: 'flex', alignItems: 'center', gap: 6 }}>

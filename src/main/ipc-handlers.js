@@ -676,6 +676,7 @@ function setupIpcHandlers() {
     const cfgImpresora = db.prepare("SELECT valor FROM configuracion WHERE clave='impresora_nombre'").get();
     const cfgPuerto    = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_linux'").get();
     const cfgPuertoUsb = db.prepare("SELECT valor FROM configuracion WHERE clave='puerto_usb_win'").get();
+    const cfgCajon     = db.prepare("SELECT valor FROM configuracion WHERE clave='cajon_activo'").get();
     const printerName  = datos.printerName || cfgImpresora?.valor || null;
     const puertoLinux  = cfgPuerto?.valor || '/dev/usb/lp0';
     const puertoUsb    = cfgPuertoUsb?.valor || 'USB001';
@@ -691,6 +692,11 @@ function setupIpcHandlers() {
     `).all(ventaId);
 
     const subtotal = detalles.reduce((s, d) => s + d.precio_unitario * d.cantidad, 0);
+
+    // Abrir cajón en el mismo buffer cuando el pago es en efectivo o mixto
+    const cajonActivo = cfgCajon?.valor === '1';
+    const pagaEfectivo = venta.metodo_pago === 'efectivo' || venta.metodo_pago === 'mixto';
+    const incluirCajon = cajonActivo && pagaEfectivo;
 
     return imprimirRecibo({
       factura_num:          venta.factura_num,
@@ -710,6 +716,7 @@ function setupIpcHandlers() {
       printerName,
       puertoUsb,
       puertoLinux,
+      incluirCajon,
     });
   });
 

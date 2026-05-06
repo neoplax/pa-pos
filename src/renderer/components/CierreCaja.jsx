@@ -115,11 +115,11 @@ export default function CierreCaja() {
       });
 
       if (result.ok) {
-        notificar(`✅ Caja cerrada — Utilidad: $${result.utilidad.toLocaleString('es-CO')}`, 'exito');
+        notificar(`Caja cerrada — Utilidad: $${result.utilidad.toLocaleString('es-CO')}`, 'exito');
         cargar();
       }
     } catch (err) {
-      notificar('❌ Error al cerrar la caja', 'error');
+      notificar('Error al cerrar la caja', 'error');
       console.error('[CierreCaja] Error:', err);
     } finally {
       setCerrando(false);
@@ -141,32 +141,32 @@ export default function CierreCaja() {
         descuadre: cajaDia.descuadre || 0,
         observacion_descuadre: cajaDia.observacion_descuadre || '',
       });
-      if (result.ok) notificar('🖨️ Cierre enviado a imprimir', 'exito');
-      else notificar('❌ Error al imprimir', 'error');
+      if (result.ok) notificar('Cierre enviado a imprimir', 'exito');
+      else notificar('Error al imprimir', 'error');
     } catch {
-      notificar('❌ Error al imprimir', 'error');
+      notificar('Error al imprimir', 'error');
     } finally {
       setImprimiendo(false);
     }
   };
 
-  if (cargando) return <div className="cargando">⏳ Cargando caja...</div>;
+  if (cargando) return <div className="cargando">Cargando caja...</div>;
 
   return (
     <div>
-      <div className="pagina-titulo">💰 Cierre de Caja</div>
+      <div className="pagina-titulo">Cierre de Caja</div>
 
       <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Resumen del día */}
         <div className="card">
-          <div className="card-titulo">📊 Resumen de ventas hoy</div>
+          <div className="card-titulo">Resumen de ventas hoy</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <FilaResumen label="Total transacciones" valor={resumen.total_transacciones || 0} unidad="ventas" />
             <hr className="divider" />
-            <FilaResumen label="💵 Ventas efectivo" valor={`$${(resumen.total_efectivo||0).toLocaleString('es-CO')}`} />
-            <FilaResumen label="📱 Ventas Nequi"    valor={`$${(resumen.total_nequi||0).toLocaleString('es-CO')}`}   />
+            <FilaResumen label="Ventas efectivo" valor={`$${(resumen.total_efectivo||0).toLocaleString('es-CO')}`} />
+            <FilaResumen label="Ventas Nequi"    valor={`$${(resumen.total_nequi||0).toLocaleString('es-CO')}`}   />
             {(resumen.total_mixto || 0) > 0 && (
-              <FilaResumen label="🔀 Ventas Mixto" valor={`$${(resumen.total_mixto||0).toLocaleString('es-CO')}`} />
+              <FilaResumen label="Ventas Mixto" valor={`$${(resumen.total_mixto||0).toLocaleString('es-CO')}`} />
             )}
             <hr className="divider" />
             <FilaResumen
@@ -184,7 +184,7 @@ export default function CierreCaja() {
                 {ventasDia.porEmpleado.map(e => (
                   <FilaResumen
                     key={e.empleado}
-                    label={`👤 ${e.empleado}`}
+                    label={e.empleado}
                     valor={`$${(e.total||0).toLocaleString('es-CO')} (${e.transacciones} ventas)`}
                   />
                 ))}
@@ -196,7 +196,7 @@ export default function CierreCaja() {
         {/* Formulario de cierre */}
         <div className="card">
           <div className="card-titulo">
-            {cajaDia?.cerrada ? '✅ Caja cerrada hoy' : '📝 Registrar cierre'}
+            {cajaDia?.cerrada ? 'Caja cerrada hoy' : 'Registrar cierre'}
           </div>
 
           {cajaDia?.cerrada ? (
@@ -207,7 +207,7 @@ export default function CierreCaja() {
 
               {/* Desglose efectivo */}
               <DesgloseCuadre
-                label="💵 Efectivo"
+                label="Efectivo"
                 base={baseEf}
                 ventas={ventasEf}
                 gastos={gastosEfDia}
@@ -216,7 +216,7 @@ export default function CierreCaja() {
               <div style={{ margin: '10px 0' }} />
               {/* Desglose Nequi */}
               <DesgloseCuadre
-                label="📱 Nequi"
+                label="Nequi"
                 base={baseNq}
                 ventas={ventasNq}
                 gastos={gastosNqDia}
@@ -255,7 +255,7 @@ export default function CierreCaja() {
                 onClick={imprimirCierre}
                 disabled={imprimiendo}
               >
-                {imprimiendo ? '⏳ Imprimiendo...' : '🖨️ Imprimir cierre'}
+                {imprimiendo ? 'Imprimiendo...' : 'Imprimir cierre'}
               </button>
             </div>
           ) : (
@@ -268,7 +268,7 @@ export default function CierreCaja() {
               )}
 
               <div className="form-grupo">
-                <label className="form-label">💵 Efectivo contado ($)</label>
+                <label className="form-label">Efectivo contado ($)</label>
                 <input
                   type="number"
                   min="0"
@@ -278,7 +278,7 @@ export default function CierreCaja() {
                 />
               </div>
               <div className="form-grupo">
-                <label className="form-label">📱 Nequi recibido ($)</label>
+                <label className="form-label">Nequi recibido ($)</label>
                 <input
                   type="number"
                   min="0"
@@ -288,7 +288,7 @@ export default function CierreCaja() {
                 />
               </div>
               <div className="form-grupo">
-                <label className="form-label">📤 Gastos del día ($)</label>
+                <label className="form-label">Gastos del día ($)</label>
                 <input
                   type="number"
                   min="0"
@@ -318,7 +318,7 @@ export default function CierreCaja() {
                 )}
               </div>
               <div className="form-grupo">
-                <label className="form-label">📝 Notas (opcional)</label>
+                <label className="form-label">Notas (opcional)</label>
                 <input
                   type="text"
                   value={notas}
@@ -331,7 +331,7 @@ export default function CierreCaja() {
 
               {/* Desglose de cuadre por método de pago */}
               <DesgloseCuadre
-                label="💵 Efectivo"
+                label="Efectivo"
                 base={baseEf}
                 ventas={ventasEf}
                 gastos={gastosEfDia}
@@ -339,7 +339,7 @@ export default function CierreCaja() {
               />
               <div style={{ margin: '6px 0' }} />
               <DesgloseCuadre
-                label="📱 Nequi"
+                label="Nequi"
                 base={baseNq}
                 ventas={ventasNq}
                 gastos={gastosNqDia}
@@ -386,7 +386,7 @@ export default function CierreCaja() {
                 onClick={cerrarCaja}
                 disabled={cerrando}
               >
-                {cerrando ? '⏳ Cerrando...' : '🔒 Cerrar Caja del Día'}
+                {cerrando ? 'Cerrando...' : 'Cerrar Caja del Día'}
               </button>
             </div>
           )}
@@ -396,7 +396,7 @@ export default function CierreCaja() {
       {/* Historial */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div className="card-titulo" style={{ marginBottom: 0 }}>📅 Historial de cierres (últimos 30 días)</div>
+          <div className="card-titulo" style={{ marginBottom: 0 }}>Historial de cierres (últimos 30 días)</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {exportPath && (
               <span style={{ fontSize: 12, color: 'var(--verde)' }}>
@@ -428,7 +428,7 @@ export default function CierreCaja() {
                 finally { setExportando(false); }
               }}
             >
-              {exportando ? 'Exportando...' : '📊 Exportar historial'}
+              {exportando ? 'Exportando...' : 'Exportar historial'}
             </button>
           </div>
         </div>

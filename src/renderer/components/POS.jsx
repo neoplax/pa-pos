@@ -19,41 +19,6 @@ const PLATAFORMAS = [
   { id: 'otro',           label: 'Otro',             comision: 0  },
 ];
 
-const EMOJIS_PROD = {
-  'Perro Americano':            '🌭',
-  'Choripán':                   '🥖',
-  'Salchipapa Americana':       '🍟',
-  'Hamburguesa Artesanal':      '🍔',
-  'Combo Perro + Gaseosa':     '🌭🥤',
-  'Combo Choripán + Gaseosa':  '🥖🥤',
-  'Combo Salchipapa + Gaseosa': '🍟🥤',
-  'Combo Hamburguesa':          '🍔🥤',
-};
-
-function getEmoji(nombre) {
-  for (const [k, v] of Object.entries(EMOJIS_PROD)) {
-    if (nombre.includes(k) || k.includes(nombre)) return v;
-  }
-  if (nombre.includes('Tocineta'))    return '🥓';
-  if (nombre.includes('Queso'))       return '🧀';
-  if (nombre.includes('Carne'))       return '🥩';
-  if (nombre.includes('Papa'))        return '🍟';
-  if (nombre.includes('Chorizo'))     return '🌭';
-  if (nombre.includes('Salchicha'))   return '🌭';
-  if (nombre.includes('Coca-Cola'))   return '🥤';
-  if (nombre.includes('Pepsi'))       return '🥤';
-  if (nombre.includes('Pony Malta'))  return '🍺';
-  if (nombre.includes('Poker'))       return '🍺';
-  if (nombre.includes('Águila'))      return '🍺';
-  if (nombre.includes('Club'))        return '🍺';
-  if (nombre.includes('Colombianita')) return '🍺';
-  if (nombre.includes('Coronita'))    return '🍺';
-  if (nombre.includes('Cola y Pola')) return '🍺';
-  if (nombre.includes('Bretaña'))     return '🥤';
-  if (nombre.includes('Qatro'))       return '🥤';
-  if (nombre.includes('Agua'))        return '💧';
-  return '🍽️';
-}
 
 export default function POS() {
   const { empleado, setEmpleado, notificar } = useApp();
@@ -291,7 +256,7 @@ export default function POS() {
   const aplicarDescuento = (desc) => {
     setDescuentoAplicado(desc);
     setModalDescuentos(false);
-    notificar(`✅ Descuento "${desc.nombre}" aplicado`, 'exito');
+    notificar(`Descuento "${desc.nombre}" aplicado`, 'exito');
   };
 
   const quitarDescuento = () => {
@@ -347,18 +312,18 @@ export default function POS() {
             efectivo_recibido: efectivoRecibidoN,
           });
           if (printResult?.aviso === 'impresora_no_disponible') {
-            notificar('⚠️ Impresora no disponible — recibo guardado como .txt', 'info');
+            notificar('Impresora no disponible — recibo guardado como .txt', 'info');
           }
         }
         if (metodoPago === 'efectivo' || metodoPago === 'mixto') {
           window.electronAPI.abrirCajon().catch(() => {});
         }
-        notificar(`✅ Venta #${result.ventaId} registrada — $${total.toLocaleString('es-CO')}`, 'exito');
+        notificar(`Venta #${result.ventaId} registrada — $${total.toLocaleString('es-CO')}`, 'exito');
         // Volver al selector: false = no re-guardar carrito, la mesa queda libre
         await volverSelectorMesas(false);
       }
     } catch (err) {
-      notificar('❌ Error al registrar la venta', 'error');
+      notificar('Error al registrar la venta', 'error');
       console.error('[POS] Error al crear venta:', err);
     } finally {
       setProcesando(false);
@@ -372,7 +337,7 @@ export default function POS() {
       return;
     }
     await window.electronAPI.imprimirRecibo({ ventaId: ultima.id, efectivo_recibido: ultima.efectivo_recibido });
-    notificar(`🖨️ Reimprimiendo factura #${ultima.factura_num}`, 'exito');
+    notificar(`Reimprimiendo factura #${ultima.factura_num}`, 'exito');
   };
 
   // ── Pantalla de selección de empleado ─────────────────────────────────────
@@ -473,7 +438,6 @@ export default function POS() {
               className="producto-btn"
               onClick={() => agregarItem(prod)}
             >
-              <span style={{ fontSize: 28 }}>{getEmoji(prod.nombre)}</span>
               <span className="prod-nombre">{prod.nombre}</span>
               <span className="prod-precio">
                 ${prod.precio.toLocaleString('es-CO')}
@@ -522,7 +486,7 @@ export default function POS() {
                 </div>
                 <div className="carrito-controles">
                   <button className="ctrl-btn rojo" onClick={() => cambiarCantidad(item.id, item.nota, -1)}>
-                    {item.cantidad === 1 ? '🗑' : '−'}
+                    {item.cantidad === 1 ? '×' : '−'}
                   </button>
                   <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700 }}>
                     {item.cantidad}
@@ -790,7 +754,7 @@ export default function POS() {
               disabled={carrito.length === 0}
               onClick={() => setConfirmando(true)}
             >
-              ✅ Cobrar ${total.toLocaleString('es-CO')}
+              Cobrar ${total.toLocaleString('es-CO')}
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -798,7 +762,7 @@ export default function POS() {
                 {mesaActual.id !== 0 ? `${mesaActual.nombre} · ` : 'Para llevar · '}
                 {esDomicilio ? `Domicilio · ` : ''}
                 ${total.toLocaleString('es-CO')} en {metodoPago === 'mixto'
-                  ? `mixto (💵${efectivoMixtoN.toLocaleString('es-CO')}+📱${nequiMixtoN.toLocaleString('es-CO')})`
+                  ? `mixto ($${efectivoMixtoN.toLocaleString('es-CO')} + Nequi $${nequiMixtoN.toLocaleString('es-CO')})`
                   : metodoPago}
                 {metodoPago === 'efectivo' && cambio >= 0
                   ? ` · cambio $${cambio.toLocaleString('es-CO')}`
@@ -816,7 +780,7 @@ export default function POS() {
                   disabled={procesando || !mixtoValido}
                   onClick={() => confirmarVenta(false)}
                 >
-                  {procesando ? 'Procesando...' : '✅ Cobrar sin imprimir'}
+                  {procesando ? 'Procesando...' : 'Cobrar sin imprimir'}
                 </button>
                 <button
                   className="btn"
@@ -844,7 +808,7 @@ function SelectorMesas({ mesas, empleado, onCargar, onSeleccionar }) {
 
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px' }}>
-      <div className="pagina-titulo">🛒 Punto de Venta</div>
+      <div className="pagina-titulo">Punto de Venta</div>
       <div style={{ fontSize: 14, color: 'var(--texto-suave)', marginBottom: 24 }}>
         Turno: <strong>{empleado}</strong> — Selecciona una mesa o "Para llevar"
       </div>
@@ -860,7 +824,6 @@ function SelectorMesas({ mesas, empleado, onCargar, onSeleccionar }) {
           display: 'flex', alignItems: 'center', gap: 12,
         }}
       >
-        <span style={{ fontSize: 28 }}>🛵</span>
         <div>
           <div>Para llevar</div>
           <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--texto-suave)' }}>
@@ -889,7 +852,6 @@ function SelectorMesas({ mesas, empleado, onCargar, onSeleccionar }) {
                 transition: 'transform 0.1s',
               }}
             >
-              <span style={{ fontSize: 28 }}>🪑</span>
               <div style={{ fontWeight: 700, fontSize: 14 }}>{mesa.nombre}</div>
               <div style={{ fontSize: 11, color, fontWeight: 600 }}>
                 {labelEstado[mesa.estado] || 'Libre'}
@@ -915,12 +877,12 @@ function SelectorMesas({ mesas, empleado, onCargar, onSeleccionar }) {
 
 // ── Modal de descuentos ────────────────────────────────────────────────────────
 function ModalDescuentos({ descuentos, subtotal, onAplicar, onCerrar }) {
-  const labelTipo = { porcentaje: '%', fijo: '$', gratis: '🎁' };
+  const labelTipo = { porcentaje: '%', fijo: '$', gratis: 'Gratis' };
 
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 340 }}>
-        <div className="modal-titulo">🏷️ Seleccionar descuento</div>
+        <div className="modal-titulo">Seleccionar descuento</div>
         <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 12 }}>
           Subtotal actual: <strong>${subtotal.toLocaleString('es-CO')}</strong>
         </div>
@@ -948,7 +910,7 @@ function ModalDescuentos({ descuentos, subtotal, onAplicar, onCerrar }) {
                     <span style={{ marginLeft: 8, color: 'var(--naranja)', fontSize: 13 }}>
                       {d.tipo === 'porcentaje' && `-${d.valor}%`}
                       {d.tipo === 'fijo'       && `-$${d.valor.toLocaleString('es-CO')}`}
-                      {d.tipo === 'gratis'     && '🎁 Gratis'}
+                      {d.tipo === 'gratis'     && 'Gratis'}
                     </span>
                   </div>
                   {d.descripcion && (
@@ -980,7 +942,7 @@ function ModalGaseosa({ producto, onSeleccionar, onCancelar }) {
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 300 }}>
-        <div className="modal-titulo">🥤 ¿Qué gaseosa incluye?</div>
+        <div className="modal-titulo">¿Qué gaseosa incluye?</div>
         <div style={{ fontSize: 13, color: 'var(--texto-suave)', marginBottom: 12 }}>
           {producto.nombre}
         </div>

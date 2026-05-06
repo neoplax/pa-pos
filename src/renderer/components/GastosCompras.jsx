@@ -3,15 +3,15 @@ import { useApp } from '../context/AppContext';
 
 // Categorías de gasto disponibles en el formulario único
 const CATEGORIAS_GASTO = [
-  { value: 'insumos',       label: '🛒 Compra de insumos'         },
-  { value: 'arriendo',      label: '🏠 Arriendo local'            },
-  { value: 'nomina',        label: '👤 Nómina / Pago empleado'    },
-  { value: 'servicios',     label: '🔌 Servicios públicos'        },
-  { value: 'mantenimiento', label: '🔧 Mantenimiento'             },
-  { value: 'publicidad',    label: '📣 Publicidad'                },
-  { value: 'transporte',    label: '🚗 Transporte'                },
-  { value: 'impuestos',     label: '📋 Impuestos / Obligaciones'  },
-  { value: 'otro',          label: '📦 Otro'                      },
+  { value: 'insumos',       label: 'Compra de insumos'         },
+  { value: 'arriendo',      label: 'Arriendo local'            },
+  { value: 'nomina',        label: 'Nómina / Pago empleado'    },
+  { value: 'servicios',     label: 'Servicios públicos'        },
+  { value: 'mantenimiento', label: 'Mantenimiento'             },
+  { value: 'publicidad',    label: 'Publicidad'                },
+  { value: 'transporte',    label: 'Transporte'                },
+  { value: 'impuestos',     label: 'Impuestos / Obligaciones'  },
+  { value: 'otro',          label: 'Otro'                      },
 ];
 
 const CAT_LABEL = Object.fromEntries(CATEGORIAS_GASTO.map(c => [c.value, c.label]));
@@ -33,10 +33,10 @@ function waUrl(telefono, mensaje) {
 }
 
 const CATEGORIAS_ING_LABEL = {
-  carne: '🥩 Carnes', pan: '🍞 Panes', lacteo: '🧀 Lácteos',
-  vegetal: '🥦 Vegetales', bebida: '🥤 Bebidas', salsa: '🫙 Salsas',
-  topping: '🌽 Toppings', desechable: '🛍️ Desechables',
-  preparado: '⏱️ Preparados', otro: '📦 Otros',
+  carne: 'Carnes', pan: 'Panes', lacteo: 'Lácteos',
+  vegetal: 'Vegetales', bebida: 'Bebidas', salsa: 'Salsas',
+  topping: 'Toppings', desechable: 'Desechables',
+  preparado: 'Preparados', otro: 'Otros',
 };
 
 export default function GastosCompras() {
@@ -83,24 +83,24 @@ export default function GastosCompras() {
       <div className="pos-tabs mb-24">
         <button className={`pos-tab ${tab === 'registrar' ? 'activo' : ''}`}
           onClick={() => setTab('registrar')}>
-          ➕ Registrar
+          Registrar
         </button>
         <button className={`pos-tab ${tab === 'pendientes' ? 'activo' : ''}`}
           onClick={() => setTab('pendientes')}>
-          🚨 Pendientes por comprar
+          Pendientes por comprar
         </button>
         <button className={`pos-tab ${tab === 'historial' ? 'activo' : ''}`}
           onClick={() => setTab('historial')}>
-          📋 Historial ({gastos.length})
+          Historial ({gastos.length})
         </button>
         <button className={`pos-tab ${tab === 'proveedores' ? 'activo' : ''}`}
           onClick={() => setTab('proveedores')}>
-          🚚 Proveedores
+          Proveedores
         </button>
       </div>
 
       {cargando && tab !== 'registrar' ? (
-        <div className="cargando">⏳ Cargando...</div>
+        <div className="cargando">Cargando...</div>
       ) : tab === 'registrar' ? (
         <TabRegistrar
           empleado={empleado}
@@ -236,7 +236,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
           monto_efectivo_mixto: metodo === 'mixto' ? mixtoEfectivoN : 0,
           monto_nequi_mixto:    metodo === 'mixto' ? mixtoNequiN    : 0,
         });
-        notificar(`✅ Compra de insumos registrada — ${items.length} ítems`, 'exito');
+        notificar(`Compra de insumos registrada — ${items.length} ítems`, 'exito');
       } else {
         // Gasto general
         const desc = categoria === 'nomina'
@@ -264,13 +264,13 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
           monto_efectivo_mixto: metodo === 'mixto' ? mixtoEfectivoN : 0,
           monto_nequi_mixto:    metodo === 'mixto' ? mixtoNequiN    : 0,
         });
-        notificar('✅ Gasto registrado', 'exito');
+        notificar('Gasto registrado', 'exito');
       }
 
       limpiar();
       onGuardado();
     } catch (err) {
-      notificar('❌ Error al guardar', 'error');
+      notificar('Error al guardar', 'error');
       console.error('[GastosCompras] guardar:', err);
     } finally {
       setGuardando(false);
@@ -280,7 +280,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
   return (
     <div style={{ maxWidth: 720 }}>
       <div className="card">
-        <div className="card-titulo">➕ Registrar gasto / compra</div>
+        <div className="card-titulo">Registrar gasto / compra</div>
         <form onSubmit={guardar} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Fila 1: Fecha + Categoría */}
@@ -435,10 +435,10 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
             <div className="form-grupo" style={{ marginBottom: 0 }}>
               <label className="form-label">Método de pago</label>
               <select value={metodo} onChange={e => { setMetodo(e.target.value); setMixtoEfectivo(''); setMixtoNequi(''); }}>
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="nequi">📱 Nequi</option>
-                <option value="transferencia">🏦 Transferencia</option>
-                <option value="mixto">🔀 Mixto</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="mixto">Mixto</option>
               </select>
             </div>
             <div className="form-grupo" style={{ marginBottom: 0 }}>
@@ -459,7 +459,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-grupo" style={{ marginBottom: 0 }}>
-                  <label className="form-label">💵 Efectivo ($)</label>
+                  <label className="form-label">Efectivo ($)</label>
                   <input
                     type="text" inputMode="decimal"
                     value={mixtoEfectivo}
@@ -468,7 +468,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
                   />
                 </div>
                 <div className="form-grupo" style={{ marginBottom: 0 }}>
-                  <label className="form-label">📱 Nequi ($)</label>
+                  <label className="form-label">Nequi ($)</label>
                   <input
                     type="text" inputMode="decimal"
                     value={mixtoNequi}
@@ -533,7 +533,7 @@ function TabRegistrar({ empleado, ingredientes, proveedores, empleados, notifica
           </div>
 
           <button type="submit" className="btn btn-primario" disabled={guardando || !mixtoValido}>
-            {guardando ? '⏳ Guardando...' : '💾 Guardar'}
+            {guardando ? 'Guardando...' : 'Guardar'}
           </button>
         </form>
       </div>
@@ -583,11 +583,11 @@ function TabPendientes({ ingredientes, proveedores, empleado, notificar, onGuard
   const confirmarCompra = async (datos) => {
     try {
       await window.electronAPI.registrarCompra({ ...datos, empleado: empleado || '' });
-      notificar(`✅ Compra de "${datos.ingrediente_nombre}" registrada`, 'exito');
+      notificar(`Compra de "${datos.ingrediente_nombre}" registrada`, 'exito');
       setModalCompra(null);
       onGuardado();
     } catch {
-      notificar('❌ Error al registrar', 'error');
+      notificar('Error al registrar', 'error');
     }
   };
 
@@ -611,17 +611,14 @@ function TabPendientes({ ingredientes, proveedores, empleado, notificar, onGuard
     <>
       <div className="grid-3 mb-24">
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">🚨</span>
           <span className="stat-label">Urgente (stock = 0)</span>
           <span className="stat-valor texto-rojo">{urgentes.length}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--amarillo)' }}>
-          <span className="stat-icono">⚠️</span>
           <span className="stat-label">Stock bajo</span>
           <span className="stat-valor" style={{ color: 'var(--amarillo)' }}>{bajos.length}</span>
         </div>
         <div className="stat-card verde">
-          <span className="stat-icono">✅</span>
           <span className="stat-label">Con stock OK</span>
           <span className="stat-valor texto-verde">{ok.length}</span>
         </div>
@@ -634,7 +631,7 @@ function TabPendientes({ ingredientes, proveedores, empleado, notificar, onGuard
       {porProveedor.sinProv.length > 0 && (
         <div className="card mb-16">
           <div className="card-titulo" style={{ color: 'var(--texto-suave)' }}>
-            ❓ Sin proveedor asignado ({porProveedor.sinProv.length})
+            Sin proveedor asignado ({porProveedor.sinProv.length})
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {porProveedor.sinProv.map(ing => (
@@ -671,16 +668,16 @@ function GrupoProveedor({ prov, items, onComprar }) {
     <div className="card mb-16">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
-          <div className="card-titulo" style={{ marginBottom: 4 }}>🚚 {prov.nombre}</div>
+          <div className="card-titulo" style={{ marginBottom: 4 }}>{prov.nombre}</div>
           <div style={{ fontSize: 13, color: 'var(--texto-suave)' }}>
             {prov.contacto_nombre && <span>{prov.contacto_nombre} · </span>}
-            📞 {prov.telefono}
+            {prov.telefono}
           </div>
         </div>
         <a href={waUrl(prov.telefono, msgPedir())} target="_blank" rel="noreferrer"
           className="btn btn-exito"
           style={{ padding: '8px 14px', fontSize: 13, textDecoration: 'none' }}>
-          📲 Pedir todo ({items.length})
+          Pedir todo ({items.length})
         </a>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -707,7 +704,7 @@ function FilaItemPendiente({ ing, mapIngProv, onComprar, provPrincipal }) {
       border: `1px solid ${esUrgente ? 'rgba(231,76,60,0.25)' : 'rgba(243,156,18,0.2)'}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 16 }}>{esUrgente ? '🚨' : '⚠️'}</span>
+        {!esUrgente && <span style={{ fontSize: 16 }}>⚠️</span>}
         <div>
           <div style={{ fontWeight: 700 }}>{ing.nombre}</div>
           <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 2 }}>
@@ -730,7 +727,7 @@ function FilaItemPendiente({ ing, mapIngProv, onComprar, provPrincipal }) {
                     borderRadius: 12, color: 'var(--azul)',
                     textDecoration: 'none', fontWeight: 600,
                   }}>
-                  🚚 {p.nombre} →
+                  {p.nombre} →
                 </a>
               ))}
             </div>
@@ -740,7 +737,7 @@ function FilaItemPendiente({ ing, mapIngProv, onComprar, provPrincipal }) {
       <button className="btn btn-exito"
         style={{ padding: '6px 14px', fontSize: 13, whiteSpace: 'nowrap', marginLeft: 12 }}
         onClick={() => onComprar(ing)}>
-        🛒 Compré
+        Compré
       </button>
     </div>
   );
@@ -779,7 +776,7 @@ function ModalComprarItem({ ingrediente, onCerrar, onConfirmar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">🛒 Registrar compra — {ingrediente.nombre}</div>
+        <div className="modal-titulo">Registrar compra — {ingrediente.nombre}</div>
         <div className="alerta azul" style={{ marginBottom: 16 }}>
           Stock actual: <strong>{formatStock(ingrediente)}</strong>
           {ingrediente.stock_minimo > 0 && (
@@ -801,10 +798,10 @@ function ModalComprarItem({ ingrediente, onCerrar, onConfirmar }) {
             <div className="form-grupo" style={{ marginBottom: 0 }}>
               <label className="form-label">Método de pago</label>
               <select value={metodo} onChange={e => { setMetodo(e.target.value); setMixtoEfectivo(''); setMixtoNequi(''); }}>
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="nequi">📱 Nequi</option>
-                <option value="transferencia">🏦 Transferencia</option>
-                <option value="mixto">🔀 Mixto</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="mixto">Mixto</option>
               </select>
             </div>
             <div className="form-grupo" style={{ marginBottom: 0 }}>
@@ -820,12 +817,12 @@ function ModalComprarItem({ ingrediente, onCerrar, onConfirmar }) {
             }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div className="form-grupo" style={{ marginBottom: 0 }}>
-                  <label className="form-label">💵 Efectivo ($)</label>
+                  <label className="form-label">Efectivo ($)</label>
                   <input type="text" inputMode="decimal" value={mixtoEfectivo}
                     onChange={e => setMixtoEfectivo(e.target.value.replace(',', '.'))} placeholder="0" />
                 </div>
                 <div className="form-grupo" style={{ marginBottom: 0 }}>
-                  <label className="form-label">📱 Nequi ($)</label>
+                  <label className="form-label">Nequi ($)</label>
                   <input type="text" inputMode="decimal" value={mixtoNequi}
                     onChange={e => setMixtoNequi(e.target.value.replace(',', '.'))} placeholder="0" />
                 </div>
@@ -858,7 +855,7 @@ function ModalComprarItem({ ingrediente, onCerrar, onConfirmar }) {
         <div className="modal-acciones">
           <button className="btn btn-secundario" onClick={onCerrar}>Cancelar</button>
           <button className="btn btn-primario" disabled={!cantidadN || guardando || !mixtoValido} onClick={guardar}>
-            {guardando ? '⏳ Guardando...' : '✅ Confirmar'}
+            {guardando ? 'Guardando...' : 'Confirmar'}
           </button>
         </div>
       </div>
@@ -896,7 +893,7 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar este gasto?')) return;
     await window.electronAPI.eliminarGasto(id);
-    notificar('🗑️ Gasto eliminado', 'info');
+    notificar('Gasto eliminado', 'info');
     onActualizar();
   };
 
@@ -919,7 +916,7 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
             <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
               <option value="todos">Todas</option>
               {CATEGORIAS_GASTO.map(c => (
-                <option key={c.value} value={c.value}>{c.label.replace(/^[^\s]+\s/, '')}</option>
+                <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
           </div>
@@ -992,15 +989,15 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
                     <td className="negrita">{g.descripcion}</td>
                     <td>
                       <span className="badge badge-azul" style={{ fontSize: 11 }}>
-                        {(CAT_LABEL[g.categoria] || g.categoria || '').replace(/^[^\s]+\s/, '')}
+                        {CAT_LABEL[g.categoria] || g.categoria || ''}
                       </span>
                     </td>
                     <td className="texto-suave">
                       {(g.metodo_pago || 'efectivo') === 'mixto' ? (
                         <span title={`Efectivo: $${(g.monto_efectivo_mixto||0).toLocaleString('es-CO')} · Nequi: $${(g.monto_nequi_mixto||0).toLocaleString('es-CO')}`}>
-                          🔀 Mixto
+                          Mixto
                           <div style={{ fontSize: 10, color: 'var(--texto-suave)', lineHeight: 1.3 }}>
-                            💵${(g.monto_efectivo_mixto||0).toLocaleString('es-CO')} / 📱${(g.monto_nequi_mixto||0).toLocaleString('es-CO')}
+                            Ef. ${(g.monto_efectivo_mixto||0).toLocaleString('es-CO')} / Nq. ${(g.monto_nequi_mixto||0).toLocaleString('es-CO')}
                           </div>
                         </span>
                       ) : (g.metodo_pago || 'efectivo')}
@@ -1014,7 +1011,7 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
                         <button onClick={() => eliminar(g.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--rojo)', cursor: 'pointer', fontSize: 14 }}
                           title="Eliminar">
-                          🗑️
+                          ×
                         </button>
                       )}
                     </td>
@@ -1032,7 +1029,7 @@ function TabHistorial({ gastos, onActualizar, notificar }) {
           onCerrar={() => setModalEdit(null)}
           onGuardar={async (id, datos) => {
             await window.electronAPI.updateGasto(id, datos);
-            notificar('✅ Gasto actualizado', 'exito');
+            notificar('Gasto actualizado', 'exito');
             setModalEdit(null);
             onActualizar();
           }}
@@ -1052,7 +1049,7 @@ function ModalEditarGasto({ gasto, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">✏️ Editar Gasto</div>
+        <div className="modal-titulo">Editar Gasto</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-grupo">
             <label className="form-label">Descripción</label>
@@ -1112,10 +1109,10 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
   const guardar = async (datos) => {
     if (modalProv?.id) {
       await window.electronAPI.updateProveedor(modalProv.id, datos);
-      notificar('✅ Proveedor actualizado', 'exito');
+      notificar('Proveedor actualizado', 'exito');
     } else {
       await window.electronAPI.agregarProveedor(datos);
-      notificar('✅ Proveedor creado', 'exito');
+      notificar('Proveedor creado', 'exito');
     }
     setModalProv(null);
     onActualizar();
@@ -1123,7 +1120,7 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
 
   const eliminar = async (id) => {
     await window.electronAPI.eliminarProveedor(id);
-    notificar('🗑️ Proveedor eliminado', 'exito');
+    notificar('Proveedor eliminado', 'exito');
     setConfirmElim(null);
     onActualizar();
   };
@@ -1133,7 +1130,7 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
       <div className="flex justify-between items-center mb-16">
         <div style={{ fontWeight: 700, fontSize: 16 }}>{proveedores.length} proveedores</div>
         <button className="btn btn-primario" onClick={() => setModalProv({})}>
-          ➕ Nuevo proveedor
+          Nuevo proveedor
         </button>
       </div>
 
@@ -1146,15 +1143,15 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 16 }}>🚚 {prov.nombre}</span>
+                    <span style={{ fontWeight: 700, fontSize: 16 }}>{prov.nombre}</span>
                     {prov.contacto_nombre && (
                       <span className="texto-suave" style={{ fontSize: 13 }}>· {prov.contacto_nombre}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13, marginBottom: 8 }}>
-                    <span>📞 {prov.telefono}</span>
-                    {prov.horario_entrega && <span>🕐 {prov.horario_entrega}</span>}
-                    {prov.forma_pago && <span>💳 {prov.forma_pago}</span>}
+                    <span>{prov.telefono}</span>
+                    {prov.horario_entrega && <span>{prov.horario_entrega}</span>}
+                    {prov.forma_pago && <span>{prov.forma_pago}</span>}
                   </div>
                   {ingNames.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -1168,17 +1165,17 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
                   <a href={`https://wa.me/57${prov.telefono}`} target="_blank" rel="noreferrer"
                     className="btn btn-exito"
                     style={{ padding: '6px 12px', fontSize: 13, textDecoration: 'none' }}>
-                    📲
+                    WA
                   </a>
                   <button className="btn btn-secundario"
                     style={{ padding: '6px 12px', fontSize: 13 }}
                     onClick={() => setModalProv(prov)}>
-                    ✏️
+                    Editar
                   </button>
                   <button className="btn btn-peligro"
                     style={{ padding: '6px 10px', fontSize: 13 }}
                     onClick={() => setConfirmElim(prov.id)}>
-                    🗑️
+                    ×
                   </button>
                 </div>
               </div>
@@ -1199,7 +1196,7 @@ function TabProveedores({ proveedores, ingredientes, notificar, onActualizar }) 
       {confirmElim !== null && (
         <div className="modal-overlay">
           <div className="modal">
-            <div className="modal-titulo">🗑️ Eliminar proveedor</div>
+            <div className="modal-titulo">Eliminar proveedor</div>
             <p style={{ marginBottom: 24 }}>¿Confirmas eliminar este proveedor?</p>
             <div className="modal-acciones">
               <button className="btn btn-secundario" onClick={() => setConfirmElim(null)}>Cancelar</button>
@@ -1246,7 +1243,7 @@ function ModalProveedor({ proveedor, ingredientes, onCerrar, onGuardar }) {
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="modal-titulo">
-          {esNuevo ? '➕ Nuevo proveedor' : `✏️ Editar — ${proveedor.nombre}`}
+          {esNuevo ? 'Nuevo proveedor' : `Editar — ${proveedor.nombre}`}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

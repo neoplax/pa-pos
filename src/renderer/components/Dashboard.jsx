@@ -9,13 +9,13 @@ const COLORES_PIE = ['#E8623A', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
 
 // Interpreta código WMO de Open-Meteo
 function descClima(code) {
-  if (code === 0) return { desc: 'Despejado', icono: '☀️' };
-  if (code <= 3)  return { desc: 'Parcialmente nublado', icono: '⛅' };
-  if (code <= 48) return { desc: 'Niebla', icono: '🌫️' };
-  if (code <= 67) return { desc: 'Lluvia', icono: '🌧️' };
-  if (code <= 82) return { desc: 'Aguacero', icono: '⛈️' };
-  if (code <= 99) return { desc: 'Tormenta eléctrica', icono: '⛈️' };
-  return { desc: 'Variable', icono: '🌤️' };
+  if (code === 0) return { desc: 'Despejado' };
+  if (code <= 3)  return { desc: 'Parcialmente nublado' };
+  if (code <= 48) return { desc: 'Niebla' };
+  if (code <= 67) return { desc: 'Lluvia' };
+  if (code <= 82) return { desc: 'Aguacero' };
+  if (code <= 99) return { desc: 'Tormenta eléctrica' };
+  return { desc: 'Variable' };
 }
 
 // Tooltip personalizado para recharts
@@ -135,7 +135,7 @@ export default function Dashboard() {
     return () => window.electronAPI.update_removeListeners();
   }, [esAdmin]);
 
-  if (cargando) return <div className="cargando">⏳ Cargando dashboard...</div>;
+  if (cargando) return <div className="cargando">Cargando dashboard...</div>;
 
   const resumen = datos?.resumen || {};
   const productoTop = datos?.productoTop;
@@ -155,7 +155,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="pagina-titulo">📊 Dashboard</div>
+      <div className="pagina-titulo">Dashboard</div>
 
       {/* Banner de actualizaciones — solo para administradores */}
       {esAdmin && updateError && (
@@ -178,7 +178,7 @@ export default function Dashboard() {
           padding: '10px 16px', marginBottom: 16, fontSize: 13,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: updateProgress ? 8 : 0 }}>
-            <span>🔄 Nueva versión <strong>v{updateInfo.version}</strong> disponible — Descargando en segundo plano...</span>
+            <span>Nueva versión <strong>v{updateInfo.version}</strong> disponible — Descargando en segundo plano...</span>
           </div>
           {updateProgress && (
             <div>
@@ -219,19 +219,16 @@ export default function Dashboard() {
       {/* Stats principales */}
       <div className="stats-grid">
         <div className="stat-card naranja">
-          <span className="stat-icono">💵</span>
           <span className="stat-label">Ventas del día</span>
           <span className="stat-valor">
             $ {(resumen.total_ventas || 0).toLocaleString('es-CO')}
           </span>
         </div>
         <div className="stat-card verde">
-          <span className="stat-icono">🧾</span>
           <span className="stat-label">Transacciones</span>
           <span className="stat-valor">{resumen.total_transacciones || 0}</span>
         </div>
         <div className="stat-card azul">
-          <span className="stat-icono">💳</span>
           <span className="stat-label">Efectivo / Nequi</span>
           <span className="stat-valor" style={{ fontSize: 18 }}>
             $ {(resumen.total_efectivo || 0).toLocaleString('es-CO')} /
@@ -239,7 +236,6 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="stat-card amarillo">
-          <span className="stat-icono">🏆</span>
           <span className="stat-label">Producto más vendido</span>
           <span className="stat-valor" style={{ fontSize: 16 }}>
             {productoTop ? `${productoTop.nombre} (×${productoTop.vendidos})` : '—'}
@@ -251,9 +247,6 @@ export default function Dashboard() {
       <div className="dashboard-top">
         {/* Clima Fusagasugá */}
         <div className="clima-widget">
-          <span className="clima-icono">
-            {clima ? descClima(clima.weather_code).icono : '🌤️'}
-          </span>
           <div className="clima-info">
             <span className="clima-ciudad">Fusagasugá, Colombia</span>
             {clima ? (
@@ -277,7 +270,7 @@ export default function Dashboard() {
           {datos?.porEmpleado?.length ? (
             datos.porEmpleado.map(e => (
               <div key={e.empleado} className="flex justify-between items-center" style={{ marginBottom: 8 }}>
-                <span>👤 {e.empleado}</span>
+                <span>{e.empleado}</span>
                 <span>
                   <strong className="texto-naranja">${(e.total||0).toLocaleString('es-CO')}</strong>
                   <span className="texto-suave" style={{ marginLeft: 8, fontSize: 13 }}>
@@ -294,10 +287,10 @@ export default function Dashboard() {
         {/* Alertas */}
         {(alertasStock.length > 0 || alertasVenc.length > 0) && (
           <div className="card" style={{ minWidth: 280 }}>
-            <div className="card-titulo">⚠️ Alertas</div>
+            <div className="card-titulo">Alertas</div>
             {alertasVenc.map(i => (
               <div key={i.id} className="alerta amarillo" style={{ marginBottom: 6 }}>
-                🕐 <strong>{i.nombre}</strong> — próximo a vencer
+                <strong>{i.nombre}</strong> — próximo a vencer
               </div>
             ))}
             {alertasStock.slice(0, 6).map(i => {
@@ -309,7 +302,7 @@ export default function Dashboard() {
                 <div key={i.id} className="alerta rojo"
                   style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    📦 <strong>{i.nombre}</strong> — stock bajo
+                    <strong>{i.nombre}</strong> — stock bajo
                     {prov && (
                       <div style={{ fontSize: 11, marginTop: 2, opacity: 0.85 }}>
                         Contactar: {prov.nombre} · {prov.telefono}
@@ -324,7 +317,7 @@ export default function Dashboard() {
                         borderRadius: 6, color: 'inherit', textDecoration: 'none',
                         fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 8,
                       }}>
-                      📲 WA
+                      WA
                     </a>
                   )}
                 </div>

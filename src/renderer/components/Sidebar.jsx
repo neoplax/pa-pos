@@ -3,14 +3,14 @@ import { useApp } from '../context/AppContext';
 
 // Todos los ítems del menú lateral
 const ITEMS_NAV = [
-  { id: 'dashboard',     icono: '📊', label: 'Dashboard',        soloAdmin: false },
-  { id: 'pos',           icono: '🛒', label: 'Punto de Venta',   soloAdmin: false },
-  { id: 'inventario',    icono: '📦', label: 'Inventario',        soloAdmin: false },
-  { id: 'cierreCaja',    icono: '💰', label: 'Cierre de Caja',   soloAdmin: true  },
-  { id: 'gastosCompras', icono: '$',  label: 'Gastos & Compras', soloAdmin: true  },
-  { id: 'reportes',      icono: '📈', label: 'Reportes',          soloAdmin: true  },
-  { id: 'rentabilidad',  icono: '📉', label: 'Rentabilidad',     soloAdmin: true  },
-  { id: 'configuracion', icono: '⚙️', label: 'Configuración',    soloAdmin: true  },
+  { id: 'dashboard',     label: 'Dashboard'        , soloAdmin: false },
+  { id: 'pos',           label: 'Punto de Venta'   , soloAdmin: false },
+  { id: 'inventario',    label: 'Inventario'        , soloAdmin: false },
+  { id: 'cierreCaja',    label: 'Cierre de Caja'   , soloAdmin: true  },
+  { id: 'gastosCompras', label: 'Gastos & Compras' , soloAdmin: true  },
+  { id: 'reportes',      label: 'Reportes'          , soloAdmin: true  },
+  { id: 'rentabilidad',  label: 'Rentabilidad'     , soloAdmin: true  },
+  { id: 'configuracion', label: 'Configuración'    , soloAdmin: true  },
 ];
 
 export default function Sidebar() {
@@ -29,7 +29,7 @@ export default function Sidebar() {
       {/* Empleado activo */}
       <div className="sidebar-empleado" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div>👤 {empleado}</div>
+          <div>{empleado}</div>
           {esAdmin && (
             <div style={{ fontSize: 10, color: 'var(--naranja)', fontWeight: 600 }}>Administrador</div>
           )}
@@ -55,9 +55,6 @@ export default function Sidebar() {
             className={`nav-item ${paginaActiva === item.id ? 'activo' : ''}`}
             onClick={() => setPaginaActiva(item.id)}
           >
-            <span className="nav-icono" style={item.id === 'gastosCompras' ? { fontWeight: 900, fontSize: 16 } : {}}>
-              {item.icono}
-            </span>
             <span>{item.label}</span>
           </div>
         ))}

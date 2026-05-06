@@ -1,6 +1,6 @@
 {
   "name": "pa-pos",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "author": {
     "name": "NEO",
     "email": "neoplaxsolucionesinformaticas@gmail.com"
@@ -73,7 +73,8 @@
       "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PA POS"
+      "shortcutName": "PA POS",
+      "requestedExecutionLevel": "requireAdministrator"
     }
   },
   "dependencies": {

@@ -96,7 +96,7 @@ export default function Configuracion() {
 
   const guardarProducto = async (id, datos) => {
     await window.electronAPI.updateProducto(id, datos);
-    notificar('✅ Producto actualizado', 'exito');
+    notificar('Producto actualizado', 'exito');
     setModalProd(null);
     cargar();
   };
@@ -108,7 +108,7 @@ export default function Configuracion() {
 
   const crearProducto = async (datos) => {
     await window.electronAPI.agregarProducto(datos);
-    notificar('✅ Producto creado', 'exito');
+    notificar('Producto creado', 'exito');
     setModalNuevoProd(false);
     cargar();
   };
@@ -117,14 +117,14 @@ export default function Configuracion() {
 
   const guardarIngrediente = async (id, datos) => {
     await window.electronAPI.updateIngredienteFull(id, datos);
-    notificar('✅ Ingrediente actualizado', 'exito');
+    notificar('Ingrediente actualizado', 'exito');
     setModalIng(null);
     cargar();
   };
 
   const crearIngrediente = async (datos) => {
     await window.electronAPI.agregarIngrediente(datos);
-    notificar('✅ Ingrediente creado', 'exito');
+    notificar('Ingrediente creado', 'exito');
     setModalNuevoIng(false);
     cargar();
   };
@@ -134,10 +134,10 @@ export default function Configuracion() {
   const guardarProveedor = async (datos) => {
     if (modalProv?.id) {
       await window.electronAPI.updateProveedor(modalProv.id, datos);
-      notificar('✅ Proveedor actualizado', 'exito');
+      notificar('Proveedor actualizado', 'exito');
     } else {
       await window.electronAPI.agregarProveedor(datos);
-      notificar('✅ Proveedor creado', 'exito');
+      notificar('Proveedor creado', 'exito');
     }
     setModalProv(null);
     cargar();
@@ -156,15 +156,15 @@ export default function Configuracion() {
     try {
       if (datos.id) {
         await window.electronAPI.updateEmpleado(datos.id, datos);
-        notificar('✅ Empleado actualizado', 'exito');
+        notificar('Empleado actualizado', 'exito');
       } else {
         await window.electronAPI.agregarEmpleado(datos);
-        notificar('✅ Empleado creado', 'exito');
+        notificar('Empleado creado', 'exito');
       }
       setModalEmp(null);
       cargar();
     } catch (err) {
-      notificar('❌ Error: ' + (err.message || 'desconocido'), 'error');
+      notificar('Error: ' + (err.message || 'desconocido'), 'error');
     }
   };
 
@@ -178,10 +178,10 @@ export default function Configuracion() {
   const guardarDescuento = async (datos) => {
     if (datos.id) {
       await window.electronAPI.updateDescuento(datos.id, datos);
-      notificar('✅ Descuento actualizado', 'exito');
+      notificar('Descuento actualizado', 'exito');
     } else {
       await window.electronAPI.agregarDescuento(datos);
-      notificar('✅ Descuento creado', 'exito');
+      notificar('Descuento creado', 'exito');
     }
     setModalDescuento(null);
     cargar();
@@ -204,10 +204,10 @@ export default function Configuracion() {
   const guardarMesa = async (datos) => {
     if (datos.id) {
       await window.electronAPI.updateMesa(datos.id, { nombre: datos.nombre });
-      notificar('✅ Mesa actualizada', 'exito');
+      notificar('Mesa actualizada', 'exito');
     } else {
       await window.electronAPI.agregarMesa({ numero: datos.numero, nombre: datos.nombre });
-      notificar('✅ Mesa creada', 'exito');
+      notificar('Mesa creada', 'exito');
     }
     setModalMesa(null);
     cargar();
@@ -309,7 +309,7 @@ export default function Configuracion() {
                           style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => toggleProducto(prod.id)}
                         >
-                          {prod.activo ? 'Ocultar' : '✅ Activar'}
+                          {prod.activo ? 'Ocultar' : 'Activar'}
                         </button>
                       </div>
                     </td>
@@ -605,7 +605,7 @@ function TabEmpleados({ empleados, onNuevo, onEditar, onToggle }) {
                   style={{ padding: '6px 14px', fontSize: 13 }}
                   onClick={() => onToggle(emp.id)}
                 >
-                  {emp.activo ? 'Desactivar' : '✅ Activar'}
+                  {emp.activo ? 'Desactivar' : 'Activar'}
                 </button>
               </div>
             </div>
@@ -1260,7 +1260,7 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
       notificar('Configuración de impresora guardada', 'exito');
       onGuardar();
     } catch (err) {
-      notificar('❌ Error guardando configuración', 'error');
+      notificar('Error guardando configuración', 'error');
     } finally {
       setGuardando(false);
     }
@@ -1282,10 +1282,10 @@ function TabImpresora({ cfg, notificar, onGuardar }) {
           notificar(`Recibo de prueba enviado${metodo}`, 'exito');
         }
       } else {
-        notificar('❌ Error: ' + (result?.error || 'desconocido'), 'error');
+        notificar('Error: ' + (result?.error || 'desconocido'), 'error');
       }
     } catch (err) {
-      notificar('❌ Error: ' + err.message, 'error');
+      notificar('Error: ' + err.message, 'error');
     } finally {
       setImprimiendo(false);
     }
@@ -1981,7 +1981,7 @@ function TabDescuentos({ descuentos, onNuevo, onEditar, onToggle, onEliminar }) 
                           style={{ padding: '6px 12px', fontSize: 13 }}
                           onClick={() => onToggle(d.id)}
                         >
-                          {d.activo ? 'Desactivar' : '✅ Activar'}
+                          {d.activo ? 'Desactivar' : 'Activar'}
                         </button>
                         <button className="btn btn-peligro" style={{ padding: '6px 10px', fontSize: 13 }}
                           onClick={() => onEliminar(d.id)}>
@@ -2206,7 +2206,7 @@ function TabMesas({ mesas, onNueva, onEditar, onToggle }) {
                 style={{ padding: '4px 8px', fontSize: 12 }}
                 onClick={() => onToggle(m.id)}
               >
-                {m.activo ? 'Desactivar' : '✅ Activar'}
+                {m.activo ? 'Desactivar' : 'Activar'}
               </button>
             </div>
           </div>
@@ -2326,11 +2326,11 @@ function TabBaseCaja({ notificar }) {
           nequi_base:    Math.round(parseFloat(nequiEdit)    || 0),
         });
       }
-      notificar('✅ Base de caja actualizada', 'exito');
+      notificar('Base de caja actualizada', 'exito');
       setEditando(false);
       cargar();
     } catch (err) {
-      notificar('❌ Error al guardar la base', 'error');
+      notificar('Error al guardar la base', 'error');
       console.error('[TabBaseCaja] Error guardar:', err);
     } finally {
       setGuardando(false);
@@ -2374,7 +2374,7 @@ function TabBaseCaja({ notificar }) {
                 onClick={guardarEdicion}
                 disabled={guardando}
               >
-                {guardando ? 'Guardando...' : '✅ Guardar'}
+                {guardando ? 'Guardando...' : 'Guardar'}
               </button>
               <button
                 className="btn btn-secundario"

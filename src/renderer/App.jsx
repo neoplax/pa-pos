@@ -137,7 +137,7 @@ function ModalBaseCaja({ hoy, efectivoBase, nequiBase, onEfectivoChange, onNequi
       }}>
         {/* Encabezado */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>💵</div>
+          <div style={{ fontSize: 40, marginBottom: 8, color: 'var(--naranja)', fontWeight: 800 }}>$</div>
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--naranja)' }}>
             Base de Caja
           </div>
@@ -149,7 +149,7 @@ function ModalBaseCaja({ hoy, efectivoBase, nequiBase, onEfectivoChange, onNequi
         {/* Campos */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
           <div className="form-grupo">
-            <label className="form-label">💵 Efectivo en caja al inicio ($)</label>
+            <label className="form-label">Efectivo en caja al inicio ($)</label>
             <input
               type="number"
               min="0"
@@ -160,7 +160,7 @@ function ModalBaseCaja({ hoy, efectivoBase, nequiBase, onEfectivoChange, onNequi
             />
           </div>
           <div className="form-grupo">
-            <label className="form-label">📱 Saldo Nequi disponible ($)</label>
+            <label className="form-label">Saldo Nequi disponible ($)</label>
             <input
               type="number"
               min="0"
@@ -182,7 +182,7 @@ function ModalBaseCaja({ hoy, efectivoBase, nequiBase, onEfectivoChange, onNequi
           onClick={onConfirmar}
           disabled={guardando}
         >
-          {guardando ? '⏳ Guardando...' : '✅ Confirmar e iniciar'}
+          {guardando ? 'Guardando...' : 'Confirmar e iniciar'}
         </button>
       </div>
     </div>
@@ -233,16 +233,16 @@ function IndicadorSync() {
         notificar('Datos descargados. Reiniciando app...', 'info');
         setTimeout(() => window.electronAPI.reiniciarApp(), 2500);
       } else if (res.ok) {
-        const msg = res.accion === 'sin_cambios' ? '✅ Ya estaba sincronizado'
-                  : res.accion === 'subida'      ? '✅ Datos subidos a Drive'
-                  : res.accion === 'descarga'    ? '✅ Datos descargados de Drive'
-                  : res.accion === 'conflicto_resuelto' ? `⚠️ ${res.msg}` : '✅ Sincronizado';
+        const msg = res.accion === 'sin_cambios' ? 'Ya estaba sincronizado'
+                  : res.accion === 'subida'      ? 'Datos subidos a Drive'
+                  : res.accion === 'descarga'    ? 'Datos descargados de Drive'
+                  : res.accion === 'conflicto_resuelto' ? res.msg : 'Sincronizado';
         notificar(msg, 'exito');
       } else {
-        notificar(`❌ ${res.msg}`, 'error');
+        notificar(res.msg, 'error');
       }
     } catch (err) {
-      notificar('❌ Error al sincronizar', 'error');
+      notificar('Error al sincronizar', 'error');
     } finally {
       setEjecutando(false);
     }
@@ -287,7 +287,7 @@ function IndicadorSync() {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>
-            ☁️ Google Drive Sync
+            Google Drive Sync
           </div>
 
           {configurado ? (
@@ -313,7 +313,7 @@ function IndicadorSync() {
                 onClick={sincronizarAhora}
                 disabled={ejecutando || estado === 'sincronizando'}
               >
-                {ejecutando ? '🔄 Sincronizando...' : '🔄 Sincronizar ahora'}
+                {ejecutando ? 'Sincronizando...' : 'Sincronizar ahora'}
               </button>
             </>
           ) : (

@@ -4,30 +4,30 @@ import { useApp } from '../context/AppContext';
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const CATEGORIAS_LABEL = {
-  carne:      '🥩 Carnes',
-  pan:        '🍞 Panes',
-  lacteo:     '🧀 Lácteos',
-  vegetal:    '🥦 Vegetales',
-  bebida:     '🥤 Bebidas',
-  salsa:      '🫙 Salsas',
-  topping:    '🌽 Toppings',
-  preparado:  '⏱️ Preparados',
-  desechable: '🛍️ Desechables',
-  otro:       '📦 Otros',
+  carne:      'Carnes',
+  pan:        'Panes',
+  lacteo:     'Lácteos',
+  vegetal:    'Vegetales',
+  bebida:     'Bebidas',
+  salsa:      'Salsas',
+  topping:    'Toppings',
+  preparado:  'Preparados',
+  desechable: 'Desechables',
+  otro:       'Otros',
 };
 
 const MOTIVOS_BAJA = [
-  { value: 'vencimiento', label: '📅 Vencimiento'          },
-  { value: 'daño',        label: '💥 Daño / Rotura'        },
-  { value: 'merma',       label: '📉 Merma en preparación' },
-  { value: 'consumo',     label: '🍴 Consumo interno'      },
-  { value: 'otro',        label: '📦 Otro'                 },
+  { value: 'vencimiento', label: 'Vencimiento'          },
+  { value: 'daño',        label: 'Daño / Rotura'        },
+  { value: 'merma',       label: 'Merma en preparación' },
+  { value: 'consumo',     label: 'Consumo interno'      },
+  { value: 'otro',        label: 'Otro'                 },
 ];
 
 // Configuración visual de cada nivel de riesgo
 const NIVEL_CONFIG = {
   sinStock: {
-    label:      '⚫ Sin stock',
+    label:      'Sin stock',
     bg:         'rgba(231,76,60,0.10)',
     borde:      'rgba(231,76,60,0.40)',
     barColor:   '#e74c3c',
@@ -36,7 +36,7 @@ const NIVEL_CONFIG = {
     colorTexto: 'var(--rojo)',
   },
   urgente: {
-    label:      '🔴 Urgente',
+    label:      'Urgente',
     bg:         'rgba(230,126,34,0.08)',
     borde:      'rgba(230,126,34,0.35)',
     barColor:   '#e67e22',
@@ -45,7 +45,7 @@ const NIVEL_CONFIG = {
     colorTexto: 'var(--naranja)',
   },
   riesgo: {
-    label:      '🟡 En riesgo',
+    label:      'En riesgo',
     bg:         'rgba(243,156,18,0.07)',
     borde:      'rgba(243,156,18,0.30)',
     barColor:   '#f39c12',
@@ -54,7 +54,7 @@ const NIVEL_CONFIG = {
     colorTexto: 'var(--amarillo)',
   },
   ok: {
-    label:      '🟢 OK',
+    label:      'OK',
     bg:         'var(--fondo-card)',
     borde:      'var(--borde)',
     barColor:   '#27ae60',
@@ -187,7 +187,7 @@ export default function Inventario() {
 
   const perecederos = ingredientes.filter(i => i.es_perecedero);
 
-  if (cargando) return <div className="cargando">⏳ Cargando inventario...</div>;
+  if (cargando) return <div className="cargando">Cargando inventario...</div>;
 
   return (
     <div>
@@ -199,15 +199,15 @@ export default function Inventario() {
 
       {/* ── Cabecera ──────────────────────────────────────────────────────── */}
       <div className="flex justify-between items-center mb-24">
-        <div className="pagina-titulo" style={{ marginBottom: 0 }}>📦 Inventario</div>
+        <div className="pagina-titulo" style={{ marginBottom: 0 }}>Inventario</div>
         <div className="flex gap-8">
           <button className="btn btn-secundario" onClick={() => setModalBaja(true)}>
-            📉 Registrar baja
+            Registrar baja
           </button>
           <button className="btn btn-secundario" onClick={() => setModalBatch(true)}>
-            🍳 Preparación batch
+            Preparación batch
           </button>
-          <button className="btn btn-secundario" onClick={cargar}>🔄 Actualizar</button>
+          <button className="btn btn-secundario" onClick={cargar}>Actualizar</button>
           <button
             className="btn btn-secundario"
             disabled={exportando}
@@ -225,7 +225,7 @@ export default function Inventario() {
               finally { setExportando(false); }
             }}
           >
-            {exportando ? 'Exportando...' : '📊 Exportar inventario'}
+            {exportando ? 'Exportando...' : 'Exportar inventario'}
           </button>
           {exportPath && (
             <button
@@ -242,11 +242,11 @@ export default function Inventario() {
       {/* ── 4 tarjetas resumen clickeables ────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { nivel: 'sinStock', icon: '⚫', color: 'var(--rojo)'    },
-          { nivel: 'urgente',  icon: '🔴', color: 'var(--naranja)' },
-          { nivel: 'riesgo',   icon: '🟡', color: 'var(--amarillo)'},
-          { nivel: 'ok',       icon: '🟢', color: 'var(--verde)'   },
-        ].map(({ nivel, icon, color }) => {
+          { nivel: 'sinStock', color: 'var(--rojo)'    },
+          { nivel: 'urgente',  color: 'var(--naranja)' },
+          { nivel: 'riesgo',   color: 'var(--amarillo)'},
+          { nivel: 'ok',       color: 'var(--verde)'   },
+        ].map(({ nivel, color }) => {
           const activo = filtroNivel === nivel;
           return (
             <div
@@ -260,7 +260,6 @@ export default function Inventario() {
                 transition: 'border 0.15s, background 0.15s',
               }}
             >
-              <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>
                 {resumen[nivel]}
               </div>
@@ -275,7 +274,7 @@ export default function Inventario() {
       {/* ── Control de Perecederos ────────────────────────────────────────── */}
       {perecederos.length > 0 && (
         <div className="card mb-24">
-          <div className="card-titulo">⏱️ Control de Perecederos</div>
+          <div className="card-titulo">Control de Perecederos</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             {perecederos.map(ing => {
               const dias = diasVencimiento(ing);
@@ -304,7 +303,7 @@ export default function Inventario() {
       {/* ── Últimas preparaciones batch ───────────────────────────────────── */}
       {preparaciones.length > 0 && (
         <div className="card mb-24">
-          <div className="card-titulo">📋 Últimas preparaciones batch</div>
+          <div className="card-titulo">Últimas preparaciones batch</div>
           <div className="tabla-wrapper">
             <table>
               <thead>
@@ -344,10 +343,10 @@ export default function Inventario() {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
             { id: 'todos',    label: `Todos (${ingredientes.length})` },
-            { id: 'sinStock', label: `⚫ Sin stock (${resumen.sinStock})` },
-            { id: 'urgente',  label: `🔴 Urgente (${resumen.urgente})` },
-            { id: 'riesgo',   label: `🟡 Riesgo (${resumen.riesgo})` },
-            { id: 'ok',       label: `🟢 OK (${resumen.ok})` },
+            { id: 'sinStock', label: `Sin stock (${resumen.sinStock})` },
+            { id: 'urgente',  label: `Urgente (${resumen.urgente})` },
+            { id: 'riesgo',   label: `Riesgo (${resumen.riesgo})` },
+            { id: 'ok',       label: `OK (${resumen.ok})` },
           ].map(t => (
             <button
               key={t.id}
@@ -363,7 +362,7 @@ export default function Inventario() {
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             type="text"
-            placeholder="🔍 Buscar ingrediente..."
+            placeholder="Buscar ingrediente..."
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             style={{ flex: 1, maxWidth: 320 }}
@@ -442,7 +441,7 @@ export default function Inventario() {
           onClick={() => setVerBajas(v => !v)}
         >
           <div className="card-titulo" style={{ marginBottom: 0 }}>
-            📉 Bajas recientes ({bajas.length})
+            Bajas recientes ({bajas.length})
           </div>
           <span style={{ color: 'var(--texto-suave)' }}>{verBajas ? '▲' : '▼'}</span>
         </div>
@@ -484,7 +483,7 @@ export default function Inventario() {
           onCerrar={() => setModalStock(null)}
           onGuardar={async (id, cantidad) => {
             await window.electronAPI.updateStock(id, cantidad);
-            notificar(`📦 Stock de "${modalStock.nombre}" actualizado`, 'exito');
+            notificar(`Stock de "${modalStock.nombre}" actualizado`, 'exito');
             setModalStock(null);
             cargar();
           }}
@@ -499,7 +498,7 @@ export default function Inventario() {
           onCerrar={() => setModalBaja(null)}
           onGuardar={async (datos) => {
             await window.electronAPI.registrarBaja(datos);
-            notificar(`📉 Baja de "${datos.ingrediente_nombre}" registrada`, 'info');
+            notificar(`Baja de "${datos.ingrediente_nombre}" registrada`, 'info');
             setModalBaja(null);
             cargar();
           }}
@@ -513,7 +512,7 @@ export default function Inventario() {
           onCerrar={() => setModalCompra(null)}
           onGuardar={async (datos) => {
             await window.electronAPI.registrarCompra({ ...datos, empleado: empleado || '' });
-            notificar(`✅ Compra de "${modalCompra.nombre}" registrada`, 'exito');
+            notificar(`Compra de "${modalCompra.nombre}" registrada`, 'exito');
             setModalCompra(null);
             cargar();
           }}
@@ -529,11 +528,11 @@ export default function Inventario() {
             try {
               const r = await window.electronAPI.crearPreparacion(datos);
               if (!r?.ok) throw new Error(r?.error || 'Error desconocido');
-              notificar(`✅ Preparación "${datos.nombre}" registrada`, 'exito');
+              notificar(`Preparación "${datos.nombre}" registrada`, 'exito');
               setModalBatch(false);
               cargar();
             } catch (err) {
-              notificar(`❌ Error al registrar preparación: ${err.message}`, 'error');
+              notificar(`Error al registrar preparación: ${err.message}`, 'error');
               throw err;
             }
           }}
@@ -698,7 +697,7 @@ function TarjetaIngrediente({ ing, nivel, provs, onComprar, onBaja, onEditar }) 
                 display: 'inline-flex', alignItems: 'center', gap: 4,
               }}
             >
-              📲 {p.nombre}
+              {p.nombre}
             </a>
           ))}
         </div>
@@ -711,14 +710,14 @@ function TarjetaIngrediente({ ing, nivel, provs, onComprar, onBaja, onEditar }) 
           style={{ flex: 1, padding: '5px 6px', fontSize: 12 }}
           onClick={() => onComprar(ing)}
         >
-          🛒 Comprar
+          Comprar
         </button>
         <button
           className="btn btn-peligro"
           style={{ flex: 1, padding: '5px 6px', fontSize: 12 }}
           onClick={() => onBaja(ing)}
         >
-          📉 Baja
+          Baja
         </button>
         <button
           className="btn btn-secundario"
@@ -726,7 +725,7 @@ function TarjetaIngrediente({ ing, nivel, provs, onComprar, onBaja, onEditar }) 
           onClick={() => onEditar(ing)}
           title="Editar stock manualmente"
         >
-          ✏️
+          Editar
         </button>
       </div>
     </div>
@@ -762,7 +761,7 @@ function ModalCompraRapida({ ingrediente, empleado, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">🛒 Registrar compra — {ingrediente.nombre}</div>
+        <div className="modal-titulo">Registrar compra — {ingrediente.nombre}</div>
         <div className="alerta azul" style={{ marginBottom: 16 }}>
           Stock actual: <strong>{formatStock(ingrediente)}</strong>
           {ingrediente.stock_minimo > 0 && (
@@ -791,9 +790,9 @@ function ModalCompraRapida({ ingrediente, empleado, onCerrar, onGuardar }) {
             <div className="form-grupo" style={{ marginBottom: 0 }}>
               <label className="form-label">Método de pago</label>
               <select value={metodo} onChange={e => setMetodo(e.target.value)}>
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="nequi">📱 Nequi</option>
-                <option value="transferencia">🏦 Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia</option>
               </select>
             </div>
             <div className="form-grupo" style={{ marginBottom: 0 }}>
@@ -822,7 +821,7 @@ function ModalCompraRapida({ ingrediente, empleado, onCerrar, onGuardar }) {
             disabled={!cantidadN || guardando}
             onClick={guardar}
           >
-            {guardando ? '⏳ Guardando...' : '✅ Confirmar'}
+            {guardando ? 'Guardando...' : 'Confirmar'}
           </button>
         </div>
       </div>
@@ -838,7 +837,7 @@ function ModalEditarStock({ ingrediente, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">✏️ Editar Stock — {ingrediente.nombre}</div>
+        <div className="modal-titulo">Editar Stock — {ingrediente.nombre}</div>
         <div className="form-grupo">
           <label className="form-label">Stock actual ({ingrediente.unidad})</label>
           <input
@@ -887,7 +886,7 @@ function ModalBaja({ ingredientes, empleado, ingredienteInicial, onCerrar, onGua
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 460 }}>
-        <div className="modal-titulo">📉 Registrar Baja de Inventario</div>
+        <div className="modal-titulo">Registrar Baja de Inventario</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-grupo">
             <label className="form-label">Ingrediente</label>
@@ -936,7 +935,7 @@ function ModalBaja({ ingredientes, empleado, ingredienteInicial, onCerrar, onGua
             disabled={guardando || !ingId || !cantidad}
             onClick={guardar}
           >
-            {guardando ? '⏳ Guardando...' : '📉 Registrar baja'}
+            {guardando ? 'Guardando...' : 'Registrar baja'}
           </button>
         </div>
       </div>
@@ -966,7 +965,7 @@ function ModalBatch({ tipos, empleado, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ minWidth: 500 }}>
-        <div className="modal-titulo">🍳 Registrar Preparación Batch</div>
+        <div className="modal-titulo">Registrar Preparación Batch</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-grupo">
             <label className="form-label">Tipo de preparación</label>
@@ -1008,7 +1007,7 @@ function ModalBatch({ tipos, empleado, onCerrar, onGuardar }) {
         <div className="modal-acciones">
           <button className="btn btn-secundario" onClick={onCerrar}>Cancelar</button>
           <button className="btn btn-primario" disabled={guardando || !tipoId} onClick={guardar}>
-            {guardando ? '⏳ Guardando...' : '✅ Registrar preparación'}
+            {guardando ? 'Guardando...' : 'Registrar preparación'}
           </button>
         </div>
       </div>

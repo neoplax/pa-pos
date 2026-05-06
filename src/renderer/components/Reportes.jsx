@@ -84,29 +84,26 @@ export default function Reportes() {
 
   return (
     <div>
-      <div className="pagina-titulo">📈 Reportes</div>
+      <div className="pagina-titulo">Reportes</div>
 
       {/* ── Saldo disponible (solo admin) ── */}
       {esAdmin && saldo && (
         <div className="card mb-24">
           <div className="card-titulo" style={{ marginBottom: 16 }}>
-            💰 SALDO DISPONIBLE ACTUAL
+            SALDO DISPONIBLE ACTUAL
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 16 }}>
             <TarjetaSaldo
-              icono="💵"
               label="Efectivo disponible"
               valor={saldo.efectivo}
               color="var(--verde)"
             />
             <TarjetaSaldo
-              icono="📱"
               label="Nequi disponible"
               valor={saldo.nequi}
               color="var(--azul)"
             />
             <TarjetaSaldo
-              icono="🏦"
               label="Total disponible"
               valor={saldo.total}
               color="var(--naranja)"
@@ -114,8 +111,8 @@ export default function Reportes() {
             />
           </div>
           <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginTop: 8 }}>
-            Base inicial hoy: 💵 ${(saldo.baseEfectivo || 0).toLocaleString('es-CO')} efectivo
-            {' '}· 📱 ${(saldo.baseNequi || 0).toLocaleString('es-CO')} Nequi.
+            Base inicial hoy: ${(saldo.baseEfectivo || 0).toLocaleString('es-CO')} efectivo
+            {' '}· ${(saldo.baseNequi || 0).toLocaleString('es-CO')} Nequi.
             {' '}Calculado sobre historial completo: base + ventas − gastos − compras por método.
           </div>
         </div>
@@ -142,31 +139,27 @@ export default function Reportes() {
               <option value={90}>Últimos 3 meses</option>
             </select>
           </div>
-          <button className="btn btn-primario" onClick={cargar}>🔍 Aplicar</button>
+          <button className="btn btn-primario" onClick={cargar}>Aplicar</button>
         </div>
       </div>
 
       {/* Stats del período */}
       <div className="stats-grid mb-24">
         <div className="stat-card naranja">
-          <span className="stat-icono">💵</span>
           <span className="stat-label">Ventas del período</span>
           <span className="stat-valor">${totalPeriodo.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">💸</span>
           <span className="stat-label">Egresos del período</span>
           <span className="stat-valor texto-rojo">${totalEgresos.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card verde">
-          <span className="stat-icono">📈</span>
           <span className="stat-label">Utilidad neta</span>
           <span className={`stat-valor ${utilidadNeta >= 0 ? 'texto-verde' : 'texto-rojo'}`}>
             ${utilidadNeta.toLocaleString('es-CO')}
           </span>
         </div>
         <div className="stat-card azul">
-          <span className="stat-icono">📊</span>
           <span className="stat-label">Ticket promedio</span>
           <span className="stat-valor">${ticketProm.toLocaleString('es-CO')}</span>
         </div>
@@ -175,14 +168,14 @@ export default function Reportes() {
       {/* Tabs */}
       <div className="pos-tabs mb-16">
         {[
-          { id: 'dias',        label: '📅 Ventas por día'    },
-          { id: 'productos',   label: '🏆 Ranking productos' },
-          { id: 'flujo',       label: '📊 Flujo de caja'    },
-          { id: 'gastos',      label: '💸 Gastos / Compras'  },
-          { id: 'proveedores', label: '🚚 Proveedores'       },
-          { id: 'domicilios',  label: '🛵 Domicilios'        },
-          { id: 'descuentos',  label: '🏷️ Descuentos'       },
-          { id: 'bajas',       label: '📉 Bajas'             },
+          { id: 'dias',        label: 'Ventas por día'    },
+          { id: 'productos',   label: 'Ranking productos' },
+          { id: 'flujo',       label: 'Flujo de caja'    },
+          { id: 'gastos',      label: 'Gastos / Compras'  },
+          { id: 'proveedores', label: 'Proveedores'       },
+          { id: 'domicilios',  label: 'Domicilios'        },
+          { id: 'descuentos',  label: 'Descuentos'       },
+          { id: 'bajas',       label: 'Bajas'             },
         ].map(t => (
           <button key={t.id}
             className={`pos-tab ${vista === t.id ? 'activo' : ''}`}
@@ -193,7 +186,7 @@ export default function Reportes() {
       </div>
 
       {cargando ? (
-        <div className="cargando">⏳ Cargando reportes...</div>
+        <div className="cargando">Cargando reportes...</div>
       ) : vista === 'dias' ? (
         <VentasPorDia datos={ventasDia} formatFecha={formatFecha} />
       ) : vista === 'productos' ? (
@@ -219,7 +212,7 @@ export default function Reportes() {
 
 // ── Tarjeta saldo disponible ──────────────────────────────────────────────────
 
-function TarjetaSaldo({ icono, label, valor, color, grande = false }) {
+function TarjetaSaldo({ label, valor, color, grande = false }) {
   return (
     <div style={{
       background: 'var(--fondo)',
@@ -228,7 +221,6 @@ function TarjetaSaldo({ icono, label, valor, color, grande = false }) {
       padding: grande ? '20px 24px' : '16px 20px',
       textAlign: 'center',
     }}>
-      <div style={{ fontSize: grande ? 32 : 24, marginBottom: 6 }}>{icono}</div>
       <div style={{ fontSize: 12, color: 'var(--texto-suave)', marginBottom: 4 }}>{label}</div>
       <div style={{
         fontSize: grande ? 22 : 18,
@@ -270,17 +262,14 @@ function FlujoCaja({ ventasDia, gastosPeriodo, formatFecha, totalPeriodo, totalE
     <div>
       <div className="stats-grid mb-24">
         <div className="stat-card naranja">
-          <span className="stat-icono">💵</span>
           <span className="stat-label">Ingresos</span>
           <span className="stat-valor">${totalPeriodo.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">💸</span>
           <span className="stat-label">Egresos</span>
           <span className="stat-valor texto-rojo">${totalEgresos.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card" style={{ borderTop: `3px solid ${utilidad >= 0 ? 'var(--verde)' : 'var(--rojo)'}` }}>
-          <span className="stat-icono">{utilidad >= 0 ? '📈' : '📉'}</span>
           <span className="stat-label">Utilidad neta</span>
           <span className={`stat-valor ${utilidad >= 0 ? 'texto-verde' : 'texto-rojo'}`}>
             ${utilidad.toLocaleString('es-CO')}
@@ -346,17 +335,14 @@ function GastosPeriodo({ compras, gastos, formatFecha, transferencias = [] }) {
     <div>
       <div className="stats-grid mb-16">
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">🛒</span>
           <span className="stat-label">Compras insumos</span>
           <span className="stat-valor texto-rojo">${totalCompras.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--amarillo)' }}>
-          <span className="stat-icono">💸</span>
           <span className="stat-label">Otros gastos</span>
           <span className="stat-valor" style={{ color: 'var(--amarillo)' }}>${totalGastos.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">📊</span>
           <span className="stat-label">Total egresos</span>
           <span className="stat-valor texto-rojo">${totalEgresos.toLocaleString('es-CO')}</span>
         </div>
@@ -553,7 +539,7 @@ function VentasPorProducto({ datos }) {
               {datos.map((prod, i) => (
                 <tr key={prod.nombre}>
                   <td style={{ color: i < 3 ? 'var(--naranja)' : 'var(--texto-suave)', fontWeight: i < 3 ? 700 : 400 }}>
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                    {i + 1}
                   </td>
                   <td className="negrita">{prod.nombre}</td>
                   <td><span className="badge badge-azul">{prod.categoria}</span></td>
@@ -619,17 +605,14 @@ function ReporteDomicilios({ data, fechaInicio, fechaFin }) {
       {/* Stats generales */}
       <div className="stats-grid mb-24">
         <div className="stat-card naranja">
-          <span className="stat-icono">🛵</span>
           <span className="stat-label">Domicilios realizados</span>
           <span className="stat-valor">{numDom}</span>
         </div>
         <div className="stat-card verde">
-          <span className="stat-icono">💵</span>
           <span className="stat-label">Total cobrado (domicilios)</span>
           <span className="stat-valor">${totalDom.toLocaleString('es-CO')}</span>
         </div>
         <div className="stat-card azul">
-          <span className="stat-icono">📊</span>
           <span className="stat-label">Promedio domicilio</span>
           <span className="stat-valor">${Math.round(promDom).toLocaleString('es-CO')}</span>
         </div>
@@ -637,11 +620,11 @@ function ReporteDomicilios({ data, fechaInicio, fechaFin }) {
 
       {/* Plataformas externas */}
       {cargandoExt ? (
-        <div className="cargando">⏳ Cargando datos de plataformas...</div>
+        <div className="cargando">Cargando datos de plataformas...</div>
       ) : porPlataforma.length > 0 ? (
         <>
           <div className="card mb-16">
-            <div className="card-titulo">📱 Plataformas externas — Comisiones del período</div>
+            <div className="card-titulo">Plataformas externas — Comisiones del período</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
               <div style={{ background: 'var(--fondo)', border: '2px solid var(--rojo)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: 'var(--texto-suave)', marginBottom: 4 }}>Total comisiones pagadas</div>
@@ -767,7 +750,7 @@ function ReporteDomicilios({ data, fechaInicio, fechaFin }) {
                 {lista.map(v => (
                   <tr key={v.id}>
                     <td className="texto-suave">{(v.fecha || '').split(' ')[0]}</td>
-                    <td>👤 {v.empleado}</td>
+                    <td>{v.empleado}</td>
                     <td className="negrita texto-naranja">${(v.total || 0).toLocaleString('es-CO')}</td>
                     <td className="negrita texto-verde">${(v.domicilio || 0).toLocaleString('es-CO')}</td>
                     <td>
@@ -811,7 +794,7 @@ function ReporteProveedores({ compras, proveedores }) {
   return (
     <div>
       <div className="card mb-16">
-        <div className="card-titulo">📋 Directorio de proveedores</div>
+        <div className="card-titulo">Directorio de proveedores</div>
         <div className="tabla-wrapper">
           <table>
             <thead>
@@ -828,7 +811,7 @@ function ReporteProveedores({ compras, proveedores }) {
                   <td>
                     <a href={`https://wa.me/57${p.telefono}`} target="_blank" rel="noreferrer"
                       className="btn btn-exito"
-                      style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}>📲</a>
+                      style={{ padding: '4px 10px', fontSize: 12, textDecoration: 'none' }}>WA</a>
                   </td>
                 </tr>
               ))}
@@ -851,7 +834,7 @@ function ReporteProveedores({ compras, proveedores }) {
                   background: 'var(--fondo)', border: '1px solid var(--borde)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700 }}>🚚 {nombre}</span>
+                    <span style={{ fontWeight: 700 }}>{nombre}</span>
                     <span>
                       <span className="texto-rojo negrita">${data.total.toLocaleString('es-CO')}</span>
                       <span className="texto-suave" style={{ marginLeft: 8, fontSize: 12 }}>({data.veces} compras)</span>
@@ -881,7 +864,7 @@ function ReporteProveedores({ compras, proveedores }) {
 // ── Reporte Descuentos ────────────────────────────────────────────────────────
 
 function ReporteDescuentos({ data }) {
-  if (!data) return <div className="cargando">⏳ Cargando...</div>;
+  if (!data) return <div className="cargando">Cargando...</div>;
 
   const { resumen = {}, porDescuento = [] } = data;
   const totalDescontado  = resumen.total_descontado   || 0;
@@ -892,19 +875,16 @@ function ReporteDescuentos({ data }) {
     <div>
       <div className="stats-grid mb-24">
         <div className="stat-card naranja">
-          <span className="stat-icono">🏷️</span>
           <span className="stat-label">Ventas con descuento</span>
           <span className="stat-valor">{ventasConDesc}</span>
         </div>
         <div className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-          <span className="stat-icono">💸</span>
           <span className="stat-label">Total descontado</span>
           <span className="stat-valor texto-rojo">
             -${Math.round(totalDescontado).toLocaleString('es-CO')}
           </span>
         </div>
         <div className="stat-card azul">
-          <span className="stat-icono">📊</span>
           <span className="stat-label">Descuento promedio</span>
           <span className="stat-valor">${Math.round(promedioDescuento).toLocaleString('es-CO')}</span>
         </div>
@@ -971,7 +951,6 @@ function ReporteBajas({ datos }) {
       <div className="stats-grid mb-24">
         {Object.entries(totalPorMotivo).map(([motivo, count]) => (
           <div key={motivo} className="stat-card" style={{ borderTop: '3px solid var(--rojo)' }}>
-            <span className="stat-icono">📉</span>
             <span className="stat-label">{motivo}</span>
             <span className="stat-valor">{count} baja{count > 1 ? 's' : ''}</span>
           </div>

@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 
-const AVATAR_DEFAULT = '👤';
-const AVATARES = { 'Juan': '👨‍🍳', 'Sofía': '👩‍🍳' };
 
 export default function Login() {
   const { setEmpleado, setRolEmpleado } = useApp();
@@ -83,7 +81,6 @@ export default function Login() {
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--naranja)'; e.currentTarget.style.transform = 'scale(1.03)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--borde)'; e.currentTarget.style.transform = 'scale(1)'; }}
               >
-                <span style={{ fontSize: 48 }}>{AVATARES[emp.nombre] || AVATAR_DEFAULT}</span>
                 <span style={{ fontSize: 20, fontWeight: 700 }}>{emp.nombre}</span>
                 {emp.rol === 'administrador' && (
                   <span style={{ fontSize: 11, color: 'var(--naranja)', fontWeight: 600 }}>Admin</span>
@@ -105,9 +102,6 @@ export default function Login() {
             ← Cambiar empleado
           </button>
 
-          <div style={{ fontSize: 32, marginBottom: 8 }}>
-            {AVATARES[seleccionado] || AVATAR_DEFAULT}
-          </div>
           <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>
             {seleccionado}
           </div>
@@ -141,7 +135,7 @@ export default function Login() {
             <TeclaPin label="⌫" onClick={borrar} variant="secundario" />
             <TeclaPin label="0" onClick={() => presionarTecla('0')} />
             <TeclaPin
-              label={verificando ? '⏳' : '✓'}
+              label={verificando ? '...' : '✓'}
               onClick={confirmar}
               variant="primario"
               disabled={pin.length === 0 || verificando}

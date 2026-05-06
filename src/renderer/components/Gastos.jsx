@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 
 const CATEGORIAS = [
-  { value: 'insumos',   label: '🛒 Insumos / Compras' },
-  { value: 'servicios', label: '🔌 Servicios (agua, luz...)' },
-  { value: 'personal',  label: '👤 Personal' },
-  { value: 'arriendo',  label: '🏠 Arriendo' },
-  { value: 'otro',      label: '📦 Otro' },
+  { value: 'insumos',   label: 'Insumos / Compras' },
+  { value: 'servicios', label: 'Servicios (agua, luz...)' },
+  { value: 'personal',  label: 'Personal' },
+  { value: 'arriendo',  label: 'Arriendo' },
+  { value: 'otro',      label: 'Otro' },
 ];
 
 const CAT_LABEL = Object.fromEntries(CATEGORIAS.map(c => [c.value, c.label]));
@@ -60,11 +60,11 @@ export default function Gastos() {
         empleado: empleado || '',
         notas: notasF.trim(),
       });
-      notificar('✅ Gasto registrado', 'exito');
+      notificar('Gasto registrado', 'exito');
       setDesc(''); setMonto(''); setNotasF('');
       cargar();
     } catch (err) {
-      notificar('❌ Error al registrar gasto', 'error');
+      notificar('Error al registrar gasto', 'error');
     } finally {
       setGuardando(false);
     }
@@ -73,7 +73,7 @@ export default function Gastos() {
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar este gasto?')) return;
     await window.electronAPI.eliminarGasto(id);
-    notificar('🗑️ Gasto eliminado', 'info');
+    notificar('Gasto eliminado', 'info');
     cargar();
   };
 
@@ -86,12 +86,12 @@ export default function Gastos() {
 
   return (
     <div>
-      <div className="pagina-titulo">💸 Gastos</div>
+      <div className="pagina-titulo">Gastos</div>
 
       <div className="grid-2" style={{ marginBottom: 24 }}>
         {/* Formulario nuevo gasto */}
         <div className="card">
-          <div className="card-titulo">➕ Registrar gasto</div>
+          <div className="card-titulo">Registrar gasto</div>
           <form onSubmit={registrar} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="form-grupo">
               <label className="form-label">Descripción *</label>
@@ -125,9 +125,9 @@ export default function Gastos() {
             <div className="form-grupo">
               <label className="form-label">Método de pago</label>
               <select value={metodo} onChange={e => setMetodo(e.target.value)}>
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="nequi">📱 Nequi</option>
-                <option value="transferencia">🏦 Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="nequi">Nequi</option>
+                <option value="transferencia">Transferencia</option>
               </select>
             </div>
             <div className="form-grupo">
@@ -140,14 +140,14 @@ export default function Gastos() {
               />
             </div>
             <button type="submit" className="btn btn-primario" disabled={guardando}>
-              {guardando ? '⏳ Guardando...' : '💾 Registrar gasto'}
+              {guardando ? 'Guardando...' : 'Registrar gasto'}
             </button>
           </form>
         </div>
 
         {/* Resumen por categoría */}
         <div className="card">
-          <div className="card-titulo">📊 Resumen del período</div>
+          <div className="card-titulo">Resumen del período</div>
           <div style={{ marginBottom: 12 }}>
             <div className="form-grupo">
               <label className="form-label">Período</label>
@@ -195,12 +195,12 @@ export default function Gastos() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div className="card-titulo" style={{ marginBottom: 0 }}>
-            📋 Historial de gastos ({gastos.length})
+            Historial de gastos ({gastos.length})
           </div>
-          <button className="btn btn-secundario" onClick={cargar}>🔄 Actualizar</button>
+          <button className="btn btn-secundario" onClick={cargar}>Actualizar</button>
         </div>
         {cargando ? (
-          <div className="cargando">⏳ Cargando...</div>
+          <div className="cargando">Cargando...</div>
         ) : gastos.length === 0 ? (
           <div className="vacio">Sin gastos registrados en este período</div>
         ) : (
@@ -224,7 +224,7 @@ export default function Gastos() {
                     <td className="negrita">{g.descripcion}</td>
                     <td>
                       <span className="badge badge-azul">
-                        {(CAT_LABEL[g.categoria] || g.categoria || '').replace(/^[^\s]+\s/, '')}
+                        {CAT_LABEL[g.categoria] || g.categoria || ''}
                       </span>
                     </td>
                     <td className="texto-suave">{g.metodo_pago || 'efectivo'}</td>
@@ -240,7 +240,7 @@ export default function Gastos() {
                           }}
                           title="Eliminar gasto"
                         >
-                          🗑️
+                          ×
                         </button>
                       )}
                     </td>
@@ -258,7 +258,7 @@ export default function Gastos() {
           onCerrar={() => setModalEdit(null)}
           onGuardar={async (id, datos) => {
             await window.electronAPI.updateGasto(id, datos);
-            notificar('✅ Gasto actualizado', 'exito');
+            notificar('Gasto actualizado', 'exito');
             setModalEdit(null);
             cargar();
           }}
@@ -278,7 +278,7 @@ function ModalEditarGasto({ gasto, onCerrar, onGuardar }) {
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <div className="modal-titulo">✏️ Editar Gasto</div>
+        <div className="modal-titulo">Editar Gasto</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-grupo">
             <label className="form-label">Descripción</label>

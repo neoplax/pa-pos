@@ -1,8 +1,7 @@
-const { shell } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
-const { execSync, exec } = require('child_process');
+const { execSync } = require('child_process');
 
 // Ancho de línea para papel 80mm (48 caracteres monoespaciados)
 const W = 48;
@@ -22,6 +21,9 @@ const CMD_BOLD_OFF    = Buffer.from([ESC, 0x45, 0x00]);  // Negrita desactivada
 const CMD_CORTE      = Buffer.from([LF, LF, LF, GS, 0x56, 0x00]);
 const CMD_CAJON_PIN2 = Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA]);
 const CMD_CAJON_PIN5 = Buffer.from([0x1B, 0x70, 0x01, 0x19, 0xFA]);
+
+// Nombre de impresora por defecto en Windows
+const DEFAULT_WIN_PRINTER = 'POS-80C';
 
 // ── Utilidades de formato ─────────────────────────────────────────────────────
 function pad(str, len)  { return String(str || '').slice(0, len).padEnd(len); }
@@ -232,6 +234,24 @@ function _guardarTxt(texto, subtipo = 'recibo', fechaStr = null) {
   return archivo;
 }
 
+// ── Log de impresión en Windows ───────────────────────────────────────────────
+function _logWin(msg) {
+  const ts = new Date().toISOString();
+  try {
+    fs.appendFileSync(
+      path.join(os.tmpdir(), 'perros-print-win.log'),
+      `[${ts}] ${msg}\n`
+    );
+  } catch (_) {}
+  console.log('[Win]', msg);
+}
+
+// ── Log de impresión en Linux ─────────────────────────────────────────────────
+function _logLin(msg) {
+  try { fs.appendFileSync('/tmp/perros-print.log', `[${new Date().toISOString()}] ${msg}\n`); } catch(_) {}
+  console.log('[Print]', msg);
+}
+
 // ── Listar impresoras del sistema (solo nombres) ──────────────────────────────
 function getPrinters() {
   try {
@@ -255,14 +275,12 @@ function getPrinters() {
 }
 
 // ── Listar impresoras con nombre Y puerto (Windows) ───────────────────────────
-// Devuelve [{ name, port }] — permite al usuario seleccionar name+port a la vez.
 function getPrintersDetailed() {
   try {
     if (process.platform !== 'win32') return [];
     const raw = execSync('wmic printer get Name,PortName /format:csv', {
       encoding: 'utf8', shell: 'cmd.exe', timeout: 5000,
     });
-    // Formato CSV: Node,Name,PortName
     const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
     const hi = lines.findIndex(l => /node,name,portname/i.test(l));
     if (hi === -1) return [];
@@ -278,167 +296,159 @@ function getPrintersDetailed() {
   }
 }
 
-// ── Impresión en Linux — ESC/POS directo al puerto de la impresora ───────────
-function printLinux(buffer, texto, puerto) {
-  const puertoReal = puerto || '/dev/usb/lp0';
-  const log = (msg) => {
-    try { fs.appendFileSync('/tmp/perros-print.log', `[${new Date().toISOString()}] ${msg}\n`); } catch(_) {}
-    console.log('[Print]', msg);
-  };
+// ── Impresión raw en Windows vía PowerShell + Win32 API ──────────────────────
+// Método definitivo: evita el spooler de Windows, escribe bytes ESC/POS directo
+// a la impresora usando winspool.drv vía P/Invoke en C# compilado en tiempo de
+// ejecución. No requiere drivers adicionales ni diálogos del sistema.
+function _imprimirRawWindows(bufferESCPOS, nombreImpresora) {
+  // Cada clase debe tener nombre único para evitar conflictos con Add-Type
+  const className = 'RawPrint' + Date.now();
+  const bytesStr  = Array.from(bufferESCPOS).join(',');
 
-  log(`Intentando imprimir en ${puertoReal}, buffer ${buffer.length} bytes`);
+  const script = `
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class ${className} {
+    [DllImport("winspool.drv", CharSet=CharSet.Ansi)]
+    public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
+    [DllImport("winspool.drv")]
+    public static extern bool StartDocPrinter(IntPtr h, int l, int[] d);
+    [DllImport("winspool.drv")]
+    public static extern bool StartPagePrinter(IntPtr h);
+    [DllImport("winspool.drv")]
+    public static extern bool WritePrinter(IntPtr h, byte[] b, int n, out int w);
+    [DllImport("winspool.drv")]
+    public static extern bool EndPagePrinter(IntPtr h);
+    [DllImport("winspool.drv")]
+    public static extern bool EndDocPrinter(IntPtr h);
+    [DllImport("winspool.drv")]
+    public static extern bool ClosePrinter(IntPtr h);
+}
+"@
+\$h = [IntPtr]::Zero
+[${className}]::OpenPrinter("${nombreImpresora}", [ref]\$h, [IntPtr]::Zero)
+[${className}]::StartDocPrinter(\$h, 1, [int[]](0,0,0,0))
+[${className}]::StartPagePrinter(\$h)
+\$b = [byte[]](${bytesStr})
+\$w = 0
+[${className}]::WritePrinter(\$h, \$b, \$b.Length, [ref]\$w)
+[${className}]::EndPagePrinter(\$h)
+[${className}]::EndDocPrinter(\$h)
+[${className}]::ClosePrinter(\$h)
+Write-Host "OK:\$w"
+`;
+
+  const scriptPath = path.join(os.tmpdir(), `papos_${Date.now()}.ps1`);
+
+  try {
+    fs.writeFileSync(scriptPath, script, 'utf8');
+    const result = execSync(
+      `powershell -ExecutionPolicy Bypass -File "${scriptPath}"`,
+      { timeout: 15000 }
+    );
+    const output = result.toString();
+    _logWin(`PowerShell resultado: ${output.trim()}`);
+    if (output.includes('OK:')) {
+      return { ok: true };
+    }
+    throw new Error('Sin confirmacion de bytes enviados');
+  } catch (err) {
+    _logWin(`PowerShell error: ${err.message}`);
+    return { ok: false, error: err.message };
+  } finally {
+    try { fs.unlinkSync(scriptPath); } catch(e) {}
+  }
+}
+
+// ── Impresión en Windows ──────────────────────────────────────────────────────
+// incluirCajon: si true, añade el comando de apertura al final del buffer
+// antes de enviarlo a WritePrinter (recomendado para efectivo/mixto)
+async function printWindows(buffer, texto, printerName, incluirCajon = false) {
+  const nombre = printerName || DEFAULT_WIN_PRINTER;
+
+  // Concatenar comando cajón al buffer si se requiere
+  const bufferFinal = incluirCajon
+    ? Buffer.concat([buffer, CMD_CAJON_PIN2])
+    : buffer;
+
+  _logWin(`Impresora: ${nombre} | ${bufferFinal.length} bytes${incluirCajon ? ' (+ cajón)' : ''}`);
+
+  const resultado = _imprimirRawWindows(bufferFinal, nombre);
+
+  // Guardar .txt siempre como registro histórico
+  _guardarTxt(texto);
+
+  if (resultado.ok) {
+    return { ok: true, metodo: 'powershell_raw' };
+  }
+
+  // Sin impresora disponible: recibo ya guardado en .txt
+  _logWin('Fallback a .txt — impresora no disponible');
+  const archivo = _guardarTxt(texto);
+  return { ok: true, metodo: 'txt_backup', path: archivo, aviso: 'impresora_no_disponible', detalle: resultado.error };
+}
+
+// ── Impresión en Linux — ESC/POS directo al puerto de la impresora ───────────
+// incluirCajon: si true, envía el comando de apertura por separado después del recibo
+function printLinux(buffer, texto, puerto, incluirCajon = false) {
+  const puertoReal = puerto || '/dev/usb/lp0';
+
+  _logLin(`Intentando imprimir en ${puertoReal}, buffer ${buffer.length} bytes`);
 
   // Intento 1: writeFileSync en modo bloqueante — escribe todos los bytes de una vez.
   // NO usar O_NONBLOCK: con ese flag writeSync puede escribir solo parcialmente sin
   // lanzar error, y la impresora recibe datos truncados (imprime '@' y '=' sueltos).
   try {
     fs.writeFileSync(puertoReal, buffer);
-    log('writeFileSync OK - impresión exitosa');
+    _logLin('writeFileSync OK - impresión exitosa');
+    if (incluirCajon) {
+      try {
+        fs.writeFileSync(puertoReal, CMD_CAJON_PIN2);
+        _logLin('Cajón: comando enviado');
+      } catch(e) {
+        _logLin(`Cajón: no se pudo enviar: ${e.message}`);
+      }
+    }
     _guardarTxt(texto);
     return { ok: true, metodo: 'escpos_raw' };
   } catch (e1) {
-    log(`Intento1 falló: code=${e1.code} msg=${e1.message}`);
+    _logLin(`Intento1 falló: code=${e1.code} msg=${e1.message}`);
 
     // Intento 2: escribir a archivo temporal y enviar con cat
     try {
       const tmpBin = path.join(os.tmpdir(), 'perros-escpos.bin');
       fs.writeFileSync(tmpBin, buffer);
-      log(`cat "${tmpBin}" > "${puertoReal}"`);
+      _logLin(`cat "${tmpBin}" > "${puertoReal}"`);
       execSync(`cat "${tmpBin}" > "${puertoReal}"`, { timeout: 5000 });
-      log('cat OK - impresión exitosa');
+      _logLin('cat OK - impresión exitosa');
+      if (incluirCajon) {
+        try { fs.writeFileSync(puertoReal, CMD_CAJON_PIN2); } catch(_) {}
+      }
       _guardarTxt(texto);
       return { ok: true, metodo: 'escpos_cat' };
     } catch (e2) {
-      log(`Intento2 (cat) falló: code=${e2.code} msg=${e2.message}`);
+      _logLin(`Intento2 (cat) falló: code=${e2.code} msg=${e2.message}`);
     }
 
     const detalle = e1.code === 'EACCES'
       ? `Sin permisos en ${puertoReal}. Ejecuta: sudo chmod 666 ${puertoReal}`
       : `Puerto no disponible (${puertoReal}): ${e1.message}`;
-    log(`Sin impresora: ${detalle}`);
+    _logLin(`Sin impresora: ${detalle}`);
     const archivo = _guardarTxt(texto);
     return { ok: true, metodo: 'txt_backup', path: archivo, aviso: 'impresora_no_disponible', detalle };
   }
 }
 
-// ── Log de impresión en Windows ───────────────────────────────────────────────
-function _logWin(msg) {
-  const ts = new Date().toISOString();
-  try {
-    fs.appendFileSync(
-      path.join(os.tmpdir(), 'perros-print-win.log'),
-      `[${ts}] ${msg}\n`
-    );
-  } catch (_) {}
-  console.log('[Win]', msg);
-}
-
-// Ejecutar un comando y devolver promesa (para impresión no bloqueante)
-function _execAsync(cmd, opts = {}) {
-  return new Promise((resolve, reject) => {
-    exec(cmd, { shell: 'cmd.exe', timeout: 10000, ...opts }, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-}
-
-// ── Impresión en Windows — cascada: USB port → share → node-thermal-printer → txt
-async function printWindows(buffer, texto, printerName, puertoUsb) {
-  const tmpDir = path.join(os.tmpdir(), 'perros-pos');
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-  const tmpBin = path.join(tmpDir, 'recibo.bin');
-  fs.writeFileSync(tmpBin, buffer);
-
-  const nombre = printerName || 'PrinterPOS-80';
-  const puerto = puertoUsb   || 'USB001';
-  _logWin(`Impresora: ${nombre} | Puerto USB: ${puerto}`);
-
-  // ── Intento 1: copy /b directo al puerto USB ─────────────────────────────────
-  const cmd1 = `copy /b "${tmpBin}" ${puerto}`;
-  try {
-    _logWin(`Intento 1 (copy /b ${puerto}): ${cmd1}`);
-    await _execAsync(cmd1);
-    _logWin('Resultado: OK (copy_usb_port)');
-    _guardarTxt(texto);
-    return { ok: true, metodo: 'copy_usb_port' };
-  } catch (e1) {
-    _logWin(`Intento 1 falló: ${e1.message}`);
-  }
-
-  // ── Intento 2: copy /b al share local ────────────────────────────────────────
-  const cmd2 = `copy /b "${tmpBin}" "\\\\%COMPUTERNAME%\\${nombre}"`;
-  try {
-    _logWin(`Intento 2 (copy /b share): ${cmd2}`);
-    await _execAsync(cmd2);
-    _logWin('Resultado: OK (copy_share)');
-    _guardarTxt(texto);
-    return { ok: true, metodo: 'copy_share' };
-  } catch (e2) {
-    _logWin(`Intento 2 falló: ${e2.message}`);
-  }
-
-  // ── Intento 3: node-thermal-printer ──────────────────────────────────────────
-  try {
-    const { printer: ThermalPrinter, types: PrinterTypes } = require('node-thermal-printer');
-    _logWin(`Intento 3 (node-thermal-printer) → printer:${nombre}`);
-    const tp = new ThermalPrinter({
-      type:                    PrinterTypes.EPSON,
-      interface:               `printer:${nombre}`,
-      removeSpecialCharacters: false,
-    });
-    const conectado = await tp.isPrinterConnected();
-    if (conectado) {
-      await tp.raw(buffer);
-      await tp.execute();
-      _logWin('Resultado: OK (node_thermal_printer)');
-      _guardarTxt(texto);
-      return { ok: true, metodo: 'node_thermal_printer' };
-    }
-    _logWin('node-thermal-printer: impresora no conectada');
-  } catch (e3) {
-    _logWin(`Intento 3 falló: ${e3.message}`);
-  }
-
-  // ── Intento 4: respaldo .txt ──────────────────────────────────────────────────
-  _logWin('Todos los intentos fallaron — respaldo .txt guardado');
-  const archivo = _guardarTxt(texto);
-  return { ok: true, metodo: 'txt_backup', path: archivo, aviso: 'impresora_no_disponible' };
-}
-
-// ── Apertura de cajón portamonedas (ESC/POS) ─────────────────────────────────
-async function abrirCajon({ pin = '2', printerName, puertoUsb, puertoLinux } = {}) {
+// ── Apertura de cajón portamonedas ────────────────────────────────────────────
+async function abrirCajon({ pin = '2', printerName, puertoLinux } = {}) {
   const cmd = pin === '5' ? CMD_CAJON_PIN5 : CMD_CAJON_PIN2;
   try {
     if (process.platform === 'win32') {
-      const nombre = printerName || 'PrinterPOS-80';
-      const puerto = puertoUsb   || 'USB001';
-
-      // Intento 1: copy /b al puerto USB
-      const tmpDir = path.join(os.tmpdir(), 'perros-pos');
-      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-      const tmpBin = path.join(tmpDir, 'cajon.bin');
-      fs.writeFileSync(tmpBin, cmd);
-      try {
-        execSync(`copy /b "${tmpBin}" ${puerto}`, { shell: 'cmd.exe', timeout: 5000 });
-        return { ok: true };
-      } catch (_) {}
-
-      // Intento 2: node-thermal-printer
-      try {
-        const { printer: ThermalPrinter, types: PrinterTypes } = require('node-thermal-printer');
-        const tp = new ThermalPrinter({
-          type:                    PrinterTypes.EPSON,
-          interface:               `printer:${nombre}`,
-          removeSpecialCharacters: false,
-        });
-        await tp.raw(cmd);
-        await tp.execute();
-        return { ok: true };
-      } catch (e) {
-        _logWin(`abrirCajon falló: ${e.message}`);
-        return { ok: false, error: e.message };
-      }
+      const nombre = printerName || DEFAULT_WIN_PRINTER;
+      _logWin(`Cajón: enviando a ${nombre}`);
+      const r = _imprimirRawWindows(cmd, nombre);
+      return r.ok ? { ok: true } : { ok: false, error: r.error };
     } else {
       const puertoReal = puertoLinux || '/dev/usb/lp0';
       try {
@@ -454,14 +464,16 @@ async function abrirCajon({ pin = '2', printerName, puertoUsb, puertoLinux } = {
 }
 
 // ── Punto de entrada: imprimir recibo de venta ────────────────────────────────
+// incluirCajon: true cuando metodo_pago es efectivo o mixto y cajon_activo está activo
 async function imprimirRecibo(datos) {
   try {
     const buffer = construirBuffer(_partesRecibo(datos));
     const texto  = generarTextoRecibo(datos);
+    const incluirCajon = !!datos.incluirCajon;
     if (process.platform === 'win32') {
-      return await printWindows(buffer, texto, datos.printerName, datos.puertoUsb);
+      return await printWindows(buffer, texto, datos.printerName, incluirCajon);
     }
-    return printLinux(buffer, texto, datos.puertoLinux);
+    return printLinux(buffer, texto, datos.puertoLinux, incluirCajon);
   } catch (err) {
     console.error('[Print] Error imprimirRecibo:', err);
     return { ok: false, error: err.message };
@@ -475,9 +487,9 @@ async function imprimirCierre(datos) {
     const texto  = generarTextoCierre(datos);
     _guardarTxt(texto, 'cierre', datos.fecha);
     if (process.platform === 'win32') {
-      return await printWindows(buffer, texto, datos.printerName, datos.puertoUsb);
+      return await printWindows(buffer, texto, datos.printerName, false);
     }
-    return printLinux(buffer, texto, datos.puertoLinux);
+    return printLinux(buffer, texto, datos.puertoLinux, false);
   } catch (err) {
     console.error('[Print] Error imprimirCierre:', err);
     return { ok: false, error: err.message };
@@ -485,15 +497,15 @@ async function imprimirCierre(datos) {
 }
 
 // ── Punto de entrada: imprimir recibo de prueba ───────────────────────────────
-async function imprimirPrueba({ printerName, puertoUsb, puertoLinux } = {}) {
+async function imprimirPrueba({ printerName, puertoLinux } = {}) {
   try {
     const partes = _partesPrueba();
     const buffer = construirBuffer(partes);
     const texto  = partes.map(p => p.texto).join('\n') + '\n';
     if (process.platform === 'win32') {
-      return await printWindows(buffer, texto, printerName, puertoUsb);
+      return await printWindows(buffer, texto, printerName, false);
     }
-    return printLinux(buffer, texto, puertoLinux);
+    return printLinux(buffer, texto, puertoLinux, false);
   } catch (err) {
     console.error('[Print] Error imprimirPrueba:', err);
     return { ok: false, error: err.message };

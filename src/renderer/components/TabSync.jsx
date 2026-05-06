@@ -52,13 +52,13 @@ export default function TabSync() {
     try {
       const res = await window.electronAPI.sync_guardarCredencialesParciales({ clientId: id, clientSecret: secret });
       if (!res.ok) {
-        notificar(`❌ No se pudieron guardar las credenciales: ${res.msg}`, 'error');
+        notificar(`No se pudieron guardar las credenciales: ${res.msg}`, 'error');
         return;
       }
       // Credenciales guardadas en disco — ahora es seguro avanzar
       setPaso(3);
     } catch (err) {
-      notificar(`❌ Error al guardar credenciales: ${err.message}`, 'error');
+      notificar(`Error al guardar credenciales: ${err.message}`, 'error');
     }
   }
 
@@ -69,17 +69,17 @@ export default function TabSync() {
       const res = await window.electronAPI.sync_iniciarOAuth();
       if (res.ok) {
         setPaso(4);
-        notificar(`✅ Google Drive conectado — ${res.email}`, 'exito');
+        notificar(`Google Drive conectado — ${res.email}`, 'exito');
         const nuevoEstado = await window.electronAPI.sync_getEstado();
         setSyncEstado(nuevoEstado);
       } else {
-        notificar(`❌ Error: ${res.msg}`, 'error');
+        notificar(res.msg, 'error');
         if (res.msg?.includes('credenciales') || res.msg?.includes('Paso 2')) {
           setPaso(2);
         }
       }
     } catch (err) {
-      notificar(`❌ Error: ${err.message}`, 'error');
+      notificar(err.message, 'error');
     } finally {
       setAutorizando(false);
     }
@@ -96,18 +96,18 @@ export default function TabSync() {
         return;
       }
       if (res.ok) {
-        const msg = res.accion === 'sin_cambios'       ? '✅ Ya estaba sincronizado'
-                  : res.accion === 'subida'             ? '✅ Datos subidos a Drive'
-                  : res.accion === 'descarga'           ? '✅ Datos descargados'
-                  : res.accion === 'conflicto_resuelto' ? `⚠️ ${res.msg}`
-                  : res.accion === 'drive_mas_reciente' ? '⬇️ Drive tiene datos nuevos — usa "Bajar datos" para aplicarlos'
-                  : '✅ Sincronizado';
+        const msg = res.accion === 'sin_cambios'       ? 'Ya estaba sincronizado'
+                  : res.accion === 'subida'             ? 'Datos subidos a Drive'
+                  : res.accion === 'descarga'           ? 'Datos descargados'
+                  : res.accion === 'conflicto_resuelto' ? res.msg
+                  : res.accion === 'drive_mas_reciente' ? 'Drive tiene datos nuevos — usa "Bajar datos" para aplicarlos'
+                  : 'Sincronizado';
         notificar(msg, 'exito');
       } else {
-        notificar(`❌ ${res.msg}`, 'error');
+        notificar(res.msg, 'error');
       }
     } catch (err) {
-      notificar(`❌ Error: ${err.message}`, 'error');
+      notificar(err.message, 'error');
     } finally {
       setEjecutando(null);
     }
@@ -117,10 +117,10 @@ export default function TabSync() {
     setEjecutando('subir');
     try {
       const res = await window.electronAPI.sync_subirAhora();
-      if (res.ok) notificar('✅ Datos subidos a Drive', 'exito');
-      else        notificar(`❌ ${res.msg}`, 'error');
+      if (res.ok) notificar('Datos subidos a Drive', 'exito');
+      else        notificar(res.msg, 'error');
     } catch (err) {
-      notificar(`❌ ${err.message}`, 'error');
+      notificar(err.message, 'error');
     } finally {
       setEjecutando(null);
     }
@@ -131,15 +131,15 @@ export default function TabSync() {
     try {
       const res = await window.electronAPI.sync_bajarAhora();
       if (res.ok && res.requiereReinicio) {
-        notificar('✅ Datos descargados. Reiniciando app en 3 s...', 'exito');
+        notificar('Datos descargados. Reiniciando app en 3 s...', 'exito');
         setTimeout(() => window.electronAPI.reiniciarApp(), 3000);
       } else if (res.ok) {
-        notificar('✅ Datos descargados de Drive', 'exito');
+        notificar('Datos descargados de Drive', 'exito');
       } else {
-        notificar(`❌ ${res.msg}`, 'error');
+        notificar(res.msg, 'error');
       }
     } catch (err) {
-      notificar(`❌ ${err.message}`, 'error');
+      notificar(err.message, 'error');
     } finally {
       setEjecutando(null);
     }
@@ -156,7 +156,7 @@ export default function TabSync() {
 
   async function guardarAutoSync() {
     await window.electronAPI.sync_configurarAuto({ activo: autoActivo, intervaloMinutos: parseInt(intervalo) || 30 });
-    notificar('✅ Configuración guardada', 'exito');
+    notificar('Configuración guardada', 'exito');
   }
 
   const hayOp = ejecutando !== null;
@@ -228,10 +228,10 @@ export default function TabSync() {
                    : '#ffeb3b',
             }}>
               {estado === 'sincronizado'   ? '✅ Sincronizado'
-             : estado === 'pendiente'      ? '🟡 Pendiente'
-             : estado === 'error'          ? '🔴 Error'
-             : estado === 'sincronizando'  ? '🔄 Sincronizando...'
-             : '⚪ Sin configurar'}
+             : estado === 'pendiente'      ? 'Pendiente'
+             : estado === 'error'          ? 'Error'
+             : estado === 'sincronizando'  ? 'Sincronizando...'
+             : 'Sin configurar'}
             </span>
           </div>
 
@@ -268,7 +268,7 @@ export default function TabSync() {
               onClick={sincronizarAhora}
               disabled={hayOp}
             >
-              {ejecutando === 'sync' ? '🔄 Sincronizando...' : '🔄 Sincronizar ahora (inteligente)'}
+              {ejecutando === 'sync' ? 'Sincronizando...' : 'Sincronizar ahora (inteligente)'}
             </button>
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -278,7 +278,7 @@ export default function TabSync() {
                 onClick={subirAhora}
                 disabled={hayOp}
               >
-                {ejecutando === 'subir' ? '⬆️ Subiendo...' : '⬆️ Subir mis datos'}
+                {ejecutando === 'subir' ? 'Subiendo...' : 'Subir mis datos'}
               </button>
               <button
                 className="btn btn-secundario"
@@ -286,7 +286,7 @@ export default function TabSync() {
                 onClick={bajarAhora}
                 disabled={hayOp}
               >
-                {ejecutando === 'bajar' ? '⬇️ Bajando...' : '⬇️ Bajar datos de Drive'}
+                {ejecutando === 'bajar' ? 'Bajando...' : 'Bajar datos de Drive'}
               </button>
             </div>
           </div>
@@ -499,7 +499,7 @@ export default function TabSync() {
                 disabled={autorizando}
                 style={{ flex: 1, padding: '10px 0' }}
               >
-                {autorizando ? '⏳ Esperando autorización...' : '🔑 Autorizar con Google'}
+                {autorizando ? 'Esperando autorización...' : 'Autorizar con Google'}
               </button>
             </div>
 
@@ -521,7 +521,7 @@ export default function TabSync() {
         {/* Paso 4: éxito */}
         {paso === 4 && (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 48, marginBottom: 12, color: 'var(--verde)' }}>✓</div>
             <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
               ¡Google Drive conectado!
             </div>
