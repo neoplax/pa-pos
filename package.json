@@ -73,7 +73,7 @@
       "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "PA POS",
+      "shortcutName": "PA POS"
     }
   },
   "dependencies": {
